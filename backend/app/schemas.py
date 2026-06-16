@@ -13,3 +13,11 @@ class LLMResponse(BaseModel):
     mock: bool
     generation_latency_ms: int
     estimated_tokens_per_second: float
+
+class UploadResponse(BaseModel):
+    status: str
+    user_id: str
+    project_id: str
+    filename: str
+    saved_path: str
+    size_bytes: int

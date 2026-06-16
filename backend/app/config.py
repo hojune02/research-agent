@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = "local-key"
     LLM_MODEL: str = "Qwen/Qwen2.5-7B-Instruct"
 
-    UPLOAD_DIR: str = "./data/uploads"
-    CHROMA_PATH: str = "./data/chroma"
-    SQLITE_PATH: str = "./data/sqlite/paperops.db"
+    UPLOAD_DIR: str = str(PROJECT_ROOT / "data" / "uploads")
+    CHROMA_PATH: str = str(PROJECT_ROOT / "data" / "chroma")
+    SQLITE_PATH: str = str(PROJECT_ROOT / "data" / "sqlite" / "paperops.db")
 
     TOP_K: int = 5
 
