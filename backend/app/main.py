@@ -19,6 +19,11 @@ from app.schemas import (
     AskRequest,
     AskResponse,
     AgentDebugResponse,
+    ToolDescription,
+    ToolListResponse,
+    CompareRequest,
+    LiteratureReviewRequest,
+    ExtractInsightsRequest,
 )
 from app.llm.client import generate_answer
 from app.tools.file_utils import (
@@ -35,6 +40,12 @@ from app.rag.vectorstore import get_collection_count, search_chunks
 
 # Phase 7 replacement from rag.qa to run_agent
 from app.agents.graph import run_agent, run_agent_debug
+
+from app.tools.paper_tools import (
+    compare_documents,
+    extract_methods_and_limitations,
+    generate_literature_review,
+)
 
 app = FastAPI(
     title="Soundable Research Agent",
@@ -353,3 +364,106 @@ def debug_agent(request: AskRequest):
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Agent debug failed: {exc}")
+    
+@app.get("/tools", response_model=ToolListResponse)
+def list_tools():
+    """
+    Lists available research automation tools.
+    """
+    return ToolListResponse(
+        tools=[
+            ToolDescription(
+                name="retrieve_context",
+                description="Search user/project-isolated Chroma vector DB for relevant document chunks.",
+                inputs=["user_id", "project_id", "query", "top_k"],
+                output="List of retrieved chunks with source, page, chunk_id, score, and text.",
+            ),
+            ToolDescription(
+                name="compare_documents",
+                description="Compare uploaded papers by methods, strengths, limitations, and open questions.",
+                inputs=["user_id", "project_id", "question", "top_k"],
+                output="Grounded comparison with citations and metrics.",
+            ),
+            ToolDescription(
+                name="generate_literature_review",
+                description="Generate a mini literature review from uploaded papers.",
+                inputs=["user_id", "project_id", "topic", "top_k"],
+                output="Literature review with citations and metrics.",
+            ),
+            ToolDescription(
+                name="extract_methods_and_limitations",
+                description="Extract methods, datasets, experiments, limitations, and future work.",
+                inputs=["user_id", "project_id", "focus", "top_k"],
+                output="Structured research insights with citations and metrics.",
+            ),
+            ToolDescription(
+                name="save_memory",
+                description="Save useful user/project memory. Stub in Phase 8; persistent SQLite memory comes in Phase 9.",
+                inputs=["user_id", "project_id", "memory_item"],
+                output="None.",
+            ),
+        ]
+    )
+
+@app.post("/compare", response_model=AskResponse)
+def compare_papers(request: CompareRequest):
+    """
+    Phase 8 endpoint.
+
+    Uses the compare_documents tool to compare uploaded papers.
+    """
+    try:
+        return compare_documents(
+            user_id=request.user_id,
+            project_id=request.project_id,
+            question=request.question,
+            top_k=request.top_k,
+        )
+
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Compare failed: {exc}")
+    
+@app.post("/lit-review", response_model=AskResponse)
+def literature_review(request: LiteratureReviewRequest):
+    """
+    Phase 8 endpoint.
+
+    Uses the generate_literature_review tool.
+    """
+    try:
+        return generate_literature_review(
+            user_id=request.user_id,
+            project_id=request.project_id,
+            topic=request.topic,
+            top_k=request.top_k,
+        )
+
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Literature review failed: {exc}")
+    
+@app.post("/extract-insights", response_model=AskResponse)
+def extract_insights(request: ExtractInsightsRequest):
+    """
+    Phase 8 endpoint.
+
+    Extracts structured research insights from uploaded papers.
+    """
+    try:
+        return extract_methods_and_limitations(
+            user_id=request.user_id,
+            project_id=request.project_id,
+            focus=request.focus,
+            top_k=request.top_k,
+        )
+
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Insight extraction failed: {exc}")

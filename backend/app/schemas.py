@@ -140,3 +140,34 @@ class AgentDebugResponse(BaseModel):
     memory_updates: list[str]
     warnings: list[str]
     answer: str
+
+class ToolDescription(BaseModel):
+    name: str
+    description: str
+    inputs: list[str]
+    output: str
+
+
+class ToolListResponse(BaseModel):
+    tools: list[ToolDescription]
+
+
+class CompareRequest(BaseModel):
+    user_id: str
+    project_id: str
+    question: str = "Compare the uploaded papers by method, strengths, limitations, and open questions."
+    top_k: int | None = None
+
+
+class LiteratureReviewRequest(BaseModel):
+    user_id: str
+    project_id: str
+    topic: str
+    top_k: int | None = None
+
+
+class ExtractInsightsRequest(BaseModel):
+    user_id: str
+    project_id: str
+    focus: str = "methods, datasets, experiments, limitations, and future work"
+    top_k: int | None = None
