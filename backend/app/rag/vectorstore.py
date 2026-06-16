@@ -6,8 +6,8 @@ from chromadb.api.models.Collection import Collection
 from sentence_transformers import SentenceTransformer
 
 from app.config import settings
-from app.schemas import DocumentChunk
-
+from app.schemas import DocumentChunk, SearchResult
+import time
 
 @lru_cache(maxsize=1)
 def get_embedding_model() -> SentenceTransformer:
@@ -115,3 +115,62 @@ def get_collection_count() -> int:
     """
     collection = get_documents_collection()
     return collection.count()
+
+
+def search_chunks(
+    user_id: str,
+    project_id: str,
+    query: str,
+    top_k: int,
+) -> tuple[list[SearchResult], int]:
+    """
+    Search Chroma for chunks relevant to query.
+
+    Important:
+    - Always filters by user_id and project_id.
+    - This prevents cross-user document leakage.
+    - Returns results plus retrieval latency in ms.
+    """
+    start_time = time.time()
+
+    collection = get_documents_collection()
+    query_embedding = embed_texts([query])[0]
+
+    raw_results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k,
+        where={
+            "$and": [
+                {"user_id": {"$eq": user_id}},
+                {"project_id": {"$eq": project_id}},
+            ]
+        },
+        include=["documents", "metadatas", "distances"],
+    )
+
+    results: list[SearchResult] = []
+
+    documents = raw_results.get("documents", [[]])[0]
+    metadatas = raw_results.get("metadatas", [[]])[0]
+    distances = raw_results.get("distances", [[]])[0]
+
+    for doc, metadata, distance in zip(documents, metadatas, distances):
+        # Chroma returns distance, not similarity.
+        # Smaller distance = more similar.
+        # For MVP, expose score as 1 / (1 + distance).
+        score = None
+        if distance is not None:
+            score = round(1.0 / (1.0 + float(distance)), 4)
+
+        results.append(
+            SearchResult(
+                source=str(metadata.get("source", "")),
+                page=int(metadata.get("page", 0)),
+                chunk_id=str(metadata.get("chunk_id", "")),
+                text=doc,
+                score=score,
+            )
+        )
+
+    retrieval_latency_ms = int((time.time() - start_time) * 1000)
+    return results, retrieval_latency_ms

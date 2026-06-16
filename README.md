@@ -117,3 +117,25 @@ Vector DB record structure:
   },
   "embedding": "[384-dimensional vector]"
 }
+
+## Phase 6 Status
+
+Implemented:
+
+- Semantic vector search over Chroma
+- User/project metadata filtering
+- `/search` endpoint
+- RAG QA endpoint `/ask`
+- Context construction from retrieved chunks
+- Citation objects
+- No-document fallback to reduce hallucination
+- Retrieval/generation/total latency metrics
+
+Search flow:
+
+```text
+query
+  -> embedding model
+  -> Chroma top-k search
+  -> metadata filter by user_id/project_id
+  -> retrieved chunks

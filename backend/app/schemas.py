@@ -78,3 +78,57 @@ class VectorDBStatsResponse(BaseModel):
     total_chunks: int
     chroma_path: str
     embedding_model: str
+
+class SearchRequest(BaseModel):
+    user_id: str
+    project_id: str
+    query: str
+    top_k: int | None = None
+
+
+class SearchResult(BaseModel):
+    source: str
+    page: int
+    chunk_id: str
+    text: str
+    score: float | None = None
+
+
+class SearchResponse(BaseModel):
+    status: str
+    user_id: str
+    project_id: str
+    query: str
+    top_k: int
+    results: list[SearchResult]
+    retrieval_latency_ms: int
+
+
+class AskRequest(BaseModel):
+    user_id: str
+    project_id: str
+    question: str
+    top_k: int | None = None
+
+
+class Citation(BaseModel):
+    source: str
+    page: int
+    chunk_id: str
+    text: str
+
+
+class AskMetrics(BaseModel):
+    retrieval_latency_ms: int
+    generation_latency_ms: int
+    total_latency_ms: int
+    llm_backend: str
+    llm_model: str
+    mock: bool
+    estimated_tokens_per_second: float
+
+
+class AskResponse(BaseModel):
+    answer: str
+    citations: list[Citation]
+    metrics: AskMetrics

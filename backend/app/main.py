@@ -13,7 +13,11 @@ from app.schemas import (
     ParsePDFPreviewResponse,
     IndexPDFRequest,
     IndexPDFResponse,
-    VectorDBStatsResponse
+    VectorDBStatsResponse,
+    SearchRequest,
+    SearchResponse,
+    AskRequest,
+    AskResponse,
 )
 from app.llm.client import generate_answer
 from app.tools.file_utils import (
@@ -24,7 +28,8 @@ from app.tools.file_utils import (
 
 from app.rag.pdf_parser import parse_pdf_into_chunks
 from app.rag.indexer import index_uploaded_pdf
-from app.rag.vectorstore import get_collection_count
+from app.rag.vectorstore import get_collection_count, search_chunks
+from app.rag.qa import answer_question
 
 app = FastAPI(
     title="Soundable Research Agent",
@@ -251,3 +256,57 @@ def vector_stats():
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to get vector stats: {exc}")
+    
+@app.post("/search", response_model=SearchResponse)
+def search_documents(request: SearchRequest):
+    """
+    Phase 6 endpoint.
+
+    Performs semantic vector search over indexed document chunks.
+    Always filters by user_id and project_id.
+    """
+    try:
+        top_k = request.top_k or settings.TOP_K
+
+        results, retrieval_latency_ms = search_chunks(
+            user_id=request.user_id,
+            project_id=request.project_id,
+            query=request.query,
+            top_k=top_k,
+        )
+
+        return SearchResponse(
+            status="ok",
+            user_id=request.user_id,
+            project_id=request.project_id,
+            query=request.query,
+            top_k=top_k,
+            results=results,
+            retrieval_latency_ms=retrieval_latency_ms,
+        )
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Search failed: {exc}")
+
+
+@app.post("/ask", response_model=AskResponse)
+def ask_documents(request: AskRequest):
+    """
+    Phase 6 endpoint.
+
+    Performs RAG QA:
+        question -> vector search -> context -> LLM answer -> citations
+    """
+    try:
+        return answer_question(
+            user_id=request.user_id,
+            project_id=request.project_id,
+            question=request.question,
+            top_k=request.top_k,
+        )
+
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Ask failed: {exc}")
