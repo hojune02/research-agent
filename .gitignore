@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Local data
+data/uploads/
+data/chroma/
+data/sqlite/
+
+# OS / editor
+.DS_Store
+.vscode/
