@@ -31,3 +31,21 @@ pip install -r backend/requirements.txt
 
 cd backend
 uvicorn app.main:app --reload --port 8000
+
+## Phase 2 Status
+
+Implemented:
+
+- OpenAI-compatible LLM client abstraction
+- `MOCK_LLM=true` local mock mode
+- `/debug/llm` endpoint
+- Basic generation latency metric
+- Graceful error handling when local LLM server is unavailable
+
+The LLM client is designed so the app can later switch between:
+
+- mock backend
+- vLLM OpenAI-compatible server
+- llama.cpp OpenAI-compatible server
+
+without changing application logic.
