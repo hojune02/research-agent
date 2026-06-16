@@ -49,3 +49,18 @@ The LLM client is designed so the app can later switch between:
 - llama.cpp OpenAI-compatible server
 
 without changing application logic.
+
+## Phase 3 Status
+
+Implemented:
+
+- Raw PDF upload endpoint
+- User/project-based file organization
+- Filename sanitization
+- Basic PDF validation
+- Local file persistence under `data/uploads/{user_id}/{project_id}/`
+
+Endpoint:
+
+```http
+POST /upload/raw
