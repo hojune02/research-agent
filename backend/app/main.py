@@ -11,6 +11,9 @@ from app.schemas import (
     ParsePDFRequest,
     ParsePDFResponse,
     ParsePDFPreviewResponse,
+    IndexPDFRequest,
+    IndexPDFResponse,
+    VectorDBStatsResponse
 )
 from app.llm.client import generate_answer
 from app.tools.file_utils import (
@@ -20,6 +23,8 @@ from app.tools.file_utils import (
 )
 
 from app.rag.pdf_parser import parse_pdf_into_chunks
+from app.rag.indexer import index_uploaded_pdf
+from app.rag.vectorstore import get_collection_count
 
 app = FastAPI(
     title="Soundable Research Agent",
@@ -209,3 +214,40 @@ def preview_parse_uploaded_pdf(request: ParsePDFRequest):
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to parse PDF preview: {exc}")
+    
+
+@app.post("/index/pdf", response_model=IndexPDFResponse)
+def index_pdf(request: IndexPDFRequest):
+    """
+    Phase 5 endpoint.
+
+    Parses an uploaded PDF and stores its chunks in Chroma vector DB.
+    """
+    try:
+        return index_uploaded_pdf(
+            user_id=request.user_id,
+            project_id=request.project_id,
+            filename=request.filename,
+        )
+
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to index PDF: {exc}")
+    
+
+@app.get("/vector/stats", response_model=VectorDBStatsResponse)
+def vector_stats():
+    """
+    Returns basic Chroma collection stats.
+    """
+    try:
+        return VectorDBStatsResponse(
+            collection=settings.CHROMA_COLLECTION,
+            total_chunks=get_collection_count(),
+            chroma_path=settings.CHROMA_PATH,
+            embedding_model=settings.EMBEDDING_MODEL,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to get vector stats: {exc}")

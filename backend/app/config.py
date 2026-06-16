@@ -21,7 +21,10 @@ class Settings(BaseSettings):
     TOP_K: int = 5
     CHUNK_SIZE: int = 900
     CHUNK_OVERLAP: int = 150
-    
+
+    CHROMA_COLLECTION: str = "research_documents"
+    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",

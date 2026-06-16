@@ -88,3 +88,32 @@ Each chunk includes:
   "text": "...",
   "char_count": 900
 }
+
+## Phase 5 Status
+
+Implemented:
+
+- Chroma persistent vector database
+- Local sentence-transformer embedding model
+- PDF chunk indexing
+- Metadata-rich vector records
+- User/project/source/page/chunk metadata
+- `/index/pdf` endpoint
+- `/vector/stats` endpoint
+
+Vector DB record structure:
+
+```json
+{
+  "id": "hojune::test-project::paper.pdf::paper_p3_c1",
+  "document": "chunk text...",
+  "metadata": {
+    "user_id": "hojune",
+    "project_id": "test-project",
+    "source": "paper.pdf",
+    "page": 3,
+    "chunk_id": "paper_p3_c1",
+    "char_count": 900
+  },
+  "embedding": "[384-dimensional vector]"
+}

@@ -55,3 +55,26 @@ class ParsePDFPreviewResponse(BaseModel):
     pages_parsed: int
     chunks_created: int
     preview_chunks: list[DocumentChunk]
+
+class IndexPDFRequest(BaseModel):
+    user_id: str
+    project_id: str
+    filename: str
+
+
+class IndexPDFResponse(BaseModel):
+    status: str
+    user_id: str
+    project_id: str
+    filename: str
+    collection: str
+    pages_parsed: int
+    chunks_indexed: int
+    embedding_model: str
+
+
+class VectorDBStatsResponse(BaseModel):
+    collection: str
+    total_chunks: int
+    chroma_path: str
+    embedding_model: str

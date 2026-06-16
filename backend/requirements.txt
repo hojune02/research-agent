@@ -6,3 +6,5 @@ pydantic-settings
 python-multipart
 openai
 pypdf
+chromadb
+sentence-transformers
