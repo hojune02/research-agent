@@ -139,3 +139,27 @@ query
   -> Chroma top-k search
   -> metadata filter by user_id/project_id
   -> retrieved chunks
+
+## Phase 7 Status
+
+Implemented:
+
+- LangGraph-based agent workflow
+- Shared `AgentState` using `TypedDict`
+- Planner node for task classification
+- Retrieval node using Chroma search
+- Synthesis node using LLM client
+- Citation-check node
+- Memory-stub node for future persistent memory
+- `/debug/agent` endpoint for inspecting workflow behavior
+
+Agent workflow:
+
+```text
+START
+  -> planner_node
+  -> retrieve_node
+  -> synthesize_node
+  -> citation_check_node
+  -> memory_stub_node
+  -> END

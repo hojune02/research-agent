@@ -8,3 +8,4 @@ openai
 pypdf
 chromadb
 sentence-transformers
+langgraph

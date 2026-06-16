@@ -18,6 +18,7 @@ from app.schemas import (
     SearchResponse,
     AskRequest,
     AskResponse,
+    AgentDebugResponse,
 )
 from app.llm.client import generate_answer
 from app.tools.file_utils import (
@@ -29,7 +30,11 @@ from app.tools.file_utils import (
 from app.rag.pdf_parser import parse_pdf_into_chunks
 from app.rag.indexer import index_uploaded_pdf
 from app.rag.vectorstore import get_collection_count, search_chunks
-from app.rag.qa import answer_question
+
+# Phase 6: from app.rag.qa import answer_question
+
+# Phase 7 replacement from rag.qa to run_agent
+from app.agents.graph import run_agent, run_agent_debug
 
 app = FastAPI(
     title="Soundable Research Agent",
@@ -289,19 +294,41 @@ def search_documents(request: SearchRequest):
         raise HTTPException(status_code=500, detail=f"Search failed: {exc}")
 
 
+# @app.post("/ask", response_model=AskResponse)
+# def ask_documents(request: AskRequest):
+#     """
+#     Phase 6 endpoint.
+
+#     Performs RAG QA:
+#         question -> vector search -> context -> LLM answer -> citations
+#     """
+#     try:
+#         return answer_question(
+#             user_id=request.user_id,
+#             project_id=request.project_id,
+#             question=request.question,
+#             top_k=request.top_k,
+#         )
+
+#     except RuntimeError as exc:
+#         raise HTTPException(status_code=503, detail=str(exc))
+
+#     except Exception as exc:
+#         raise HTTPException(status_code=500, detail=f"Ask failed: {exc}")
+
 @app.post("/ask", response_model=AskResponse)
 def ask_documents(request: AskRequest):
     """
-    Phase 6 endpoint.
+    Phase 7 endpoint.
 
-    Performs RAG QA:
-        question -> vector search -> context -> LLM answer -> citations
+    Runs the LangGraph agent workflow:
+        planner -> retrieve -> synthesize -> citation_check -> memory_stub
     """
     try:
-        return answer_question(
+        return run_agent(
             user_id=request.user_id,
             project_id=request.project_id,
-            question=request.question,
+            user_query=request.question,
             top_k=request.top_k,
         )
 
@@ -310,3 +337,19 @@ def ask_documents(request: AskRequest):
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Ask failed: {exc}")
+    
+@app.post("/debug/agent", response_model=AgentDebugResponse)
+def debug_agent(request: AskRequest):
+    """
+    Debug endpoint showing internal LangGraph workflow result.
+    """
+    try:
+        return run_agent_debug(
+            user_id=request.user_id,
+            project_id=request.project_id,
+            user_query=request.question,
+            top_k=request.top_k,
+        )
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Agent debug failed: {exc}")

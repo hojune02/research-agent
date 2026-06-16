@@ -132,3 +132,11 @@ class AskResponse(BaseModel):
     answer: str
     citations: list[Citation]
     metrics: AskMetrics
+
+class AgentDebugResponse(BaseModel):
+    task_type: str
+    retrieved_chunks: int
+    citations: int
+    memory_updates: list[str]
+    warnings: list[str]
+    answer: str
