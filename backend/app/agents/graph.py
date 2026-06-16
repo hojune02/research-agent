@@ -12,7 +12,7 @@ from app.agents.state import AgentState, TaskType
 from app.config import settings
 from app.llm.client import generate_answer
 # Phase 7: from app.rag.vectorstore import search_chunks
-from app.tools.paper_tools import retrieve_context
+from app.tools.paper_tools import retrieve_context, save_memory
 from app.schemas import AskMetrics, AskResponse, Citation
 
 
@@ -164,26 +164,44 @@ def citation_check_node(state: AgentState) -> AgentState:
     }
 
 
-def memory_stub_node(state: AgentState) -> AgentState:
+def memory_update_node(state: AgentState) -> AgentState:
     """
-    Placeholder memory node.
+    Persistent memory node.
 
-    Real SQLite memory comes in Phase 9.
-    For now, we generate memory update candidates.
+    Saves useful project-level memory to SQLite.
     """
     memory_updates: list[str] = []
 
     task_type = state.get("task_type", "unknown")
+    user_id = state["user_id"]
+    project_id = state["project_id"]
 
     if task_type != "unknown":
         memory_updates.append(
-            f"User asked a {task_type} question in project '{state['project_id']}'."
+            f"User asked a {task_type} question in project '{project_id}'."
         )
 
-    if state.get("retrieved_chunks"):
-        sources = sorted({chunk.source for chunk in state["retrieved_chunks"]})
+    retrieved_chunks = state.get("retrieved_chunks", [])
+
+    if retrieved_chunks:
+        sources = sorted({chunk.source for chunk in retrieved_chunks})
         memory_updates.append(
             f"Retrieved context from sources: {', '.join(sources)}."
+        )
+
+    user_query = state.get("user_query", "").strip()
+
+    if user_query:
+        memory_updates.append(
+            f"Recent research question: {user_query}"
+        )
+
+    for item in memory_updates:
+        save_memory(
+            user_id=user_id,
+            project_id=project_id,
+            memory_item=item,
+            memory_type="agent",
         )
 
     return {
@@ -201,14 +219,14 @@ def build_agent_graph():
     graph.add_node("retrieve", retrieve_node)
     graph.add_node("synthesize", synthesize_node)
     graph.add_node("citation_check", citation_check_node)
-    graph.add_node("memory_stub", memory_stub_node)
+    graph.add_node("memory_update", memory_update_node)
 
     graph.add_edge(START, "planner")
     graph.add_edge("planner", "retrieve")
     graph.add_edge("retrieve", "synthesize")
     graph.add_edge("synthesize", "citation_check")
-    graph.add_edge("citation_check", "memory_stub")
-    graph.add_edge("memory_stub", END)
+    graph.add_edge("citation_check", "memory_update")
+    graph.add_edge("memory_update", END)
 
     return graph.compile()
 

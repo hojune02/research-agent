@@ -171,3 +171,34 @@ class ExtractInsightsRequest(BaseModel):
     project_id: str
     focus: str = "methods, datasets, experiments, limitations, and future work"
     top_k: int | None = None
+
+class MemoryCreateRequest(BaseModel):
+    user_id: str
+    project_id: str
+    memory_item: str
+    memory_type: str = "project"
+
+
+class MemoryItem(BaseModel):
+    id: int
+    user_id: str
+    project_id: str
+    memory_item: str
+    memory_type: str
+    created_at: str
+
+
+class MemoryListResponse(BaseModel):
+    user_id: str
+    project_id: str
+    memories: list[MemoryItem]
+
+
+class MemoryCreateResponse(BaseModel):
+    status: str
+    memory: MemoryItem
+
+
+class MemoryDeleteResponse(BaseModel):
+    status: str
+    deleted_id: int

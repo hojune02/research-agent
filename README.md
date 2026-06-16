@@ -163,3 +163,42 @@ START
   -> citation_check_node
   -> memory_stub_node
   -> END
+
+## Phase 8 Status
+
+Implemented research automation tools:
+
+- `retrieve_context`
+- `compare_documents`
+- `generate_literature_review`
+- `extract_methods_and_limitations`
+- `save_memory` stub
+
+New endpoints:
+
+```http
+GET  /tools
+POST /compare
+POST /lit-review
+POST /extract-insights
+
+## Phase 9 Status
+
+Implemented persistent SQLite memory:
+
+- SQLite database initialization
+- `memories` table
+- `create_memory`
+- `list_memories`
+- `delete_memory`
+- duplicate-aware `create_memory_if_new`
+- persistent `save_memory` tool
+- LangGraph `memory_update_node`
+- memory API endpoints
+
+New endpoints:
+
+```http
+GET    /memory/{user_id}/{project_id}
+POST   /memory
+DELETE /memory/{memory_id}

@@ -24,6 +24,10 @@ from app.schemas import (
     CompareRequest,
     LiteratureReviewRequest,
     ExtractInsightsRequest,
+    MemoryCreateRequest,
+    MemoryCreateResponse,
+    MemoryListResponse,
+    MemoryDeleteResponse,
 )
 from app.llm.client import generate_answer
 from app.tools.file_utils import (
@@ -47,11 +51,17 @@ from app.tools.paper_tools import (
     generate_literature_review,
 )
 
+from app.db.models import init_db
+from app.db.memory import create_memory, delete_memory, list_memories
+
 app = FastAPI(
     title="Soundable Research Agent",
     description="Local multi-user research automation agent with RAG, tool calling, memory, and local LLM serving.",
     version="0.1.0",
 )
+@app.on_event("startup")
+def startup_event():
+    init_db()
 
 
 @app.get("/")
@@ -398,9 +408,9 @@ def list_tools():
             ),
             ToolDescription(
                 name="save_memory",
-                description="Save useful user/project memory. Stub in Phase 8; persistent SQLite memory comes in Phase 9.",
-                inputs=["user_id", "project_id", "memory_item"],
-                output="None.",
+                description="Save useful user/project memory to persistent SQLite storage.",
+                inputs=["user_id", "project_id", "memory_item", "memory_type"],
+                output="Persistent memory record stored in SQLite.",
             ),
         ]
     )
@@ -467,3 +477,56 @@ def extract_insights(request: ExtractInsightsRequest):
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Insight extraction failed: {exc}")
+    
+@app.get("/memory/{user_id}/{project_id}", response_model=MemoryListResponse)
+def get_project_memory(user_id: str, project_id: str):
+    """
+    List stored memory for a user/project.
+    """
+    memories = list_memories(
+        user_id=user_id,
+        project_id=project_id,
+    )
+
+    return MemoryListResponse(
+        user_id=user_id,
+        project_id=project_id,
+        memories=memories,
+    )
+
+
+@app.post("/memory", response_model=MemoryCreateResponse)
+def add_project_memory(request: MemoryCreateRequest):
+    """
+    Manually add memory for a user/project.
+    """
+    memory = create_memory(
+        user_id=request.user_id,
+        project_id=request.project_id,
+        memory_item=request.memory_item,
+        memory_type=request.memory_type,
+    )
+
+    return MemoryCreateResponse(
+        status="created",
+        memory=memory,
+    )
+
+
+@app.delete("/memory/{memory_id}", response_model=MemoryDeleteResponse)
+def remove_project_memory(memory_id: int):
+    """
+    Delete memory by ID.
+    """
+    deleted = delete_memory(memory_id)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Memory not found: {memory_id}",
+        )
+
+    return MemoryDeleteResponse(
+        status="deleted",
+        deleted_id=memory_id,
+    )

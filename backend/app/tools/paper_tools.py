@@ -226,18 +226,38 @@ def extract_methods_and_limitations(
     )
 
 
+# def save_memory(
+#     user_id: str,
+#     project_id: str,
+#     memory_item: str,
+# ) -> None:
+#     """
+#     Tool: save_memory
+
+#     Phase 8 stub.
+#     Real SQLite-backed memory is implemented in Phase 9.
+#     """
+#     print(
+#         f"[MEMORY_STUB] user_id={user_id}, "
+#         f"project_id={project_id}, memory_item={memory_item}"
+#     )
+
+from app.db.memory import create_memory_if_new
+
 def save_memory(
     user_id: str,
     project_id: str,
     memory_item: str,
+    memory_type: str = "project",
 ) -> None:
     """
     Tool: save_memory
 
-    Phase 8 stub.
-    Real SQLite-backed memory is implemented in Phase 9.
+    Saves useful user/project memory to SQLite.
     """
-    print(
-        f"[MEMORY_STUB] user_id={user_id}, "
-        f"project_id={project_id}, memory_item={memory_item}"
+    create_memory_if_new(
+        user_id=user_id,
+        project_id=project_id,
+        memory_item=memory_item,
+        memory_type=memory_type,
     )
