@@ -54,3 +54,14 @@ def build_upload_path(upload_dir: str, user_id: str, project_id: str, filename: 
         raise ValueError("project_id cannot be empty after sanitization.")
 
     return Path(upload_dir) / safe_user_id / safe_project_id / safe_filename
+
+def get_uploaded_pdf_path(upload_dir: str, user_id: str, project_id: str, filename: str) -> Path:
+    """
+    Safely reconstruct the path for a previously uploaded PDF.
+    """
+    return build_upload_path(
+        upload_dir=upload_dir,
+        user_id=user_id,
+        project_id=project_id,
+        filename=filename,
+    )

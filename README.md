@@ -64,3 +64,27 @@ Endpoint:
 
 ```http
 POST /upload/raw
+
+## Phase 4 Status
+
+Implemented:
+
+- PDF text extraction with `pypdf`
+- Page-level parsing
+- Character-based chunking with overlap
+- Metadata-rich document chunks
+- `/parse/pdf` endpoint
+- `/parse/pdf/preview` endpoint
+
+Each chunk includes:
+
+```json
+{
+  "chunk_id": "paper_p3_c1",
+  "user_id": "hojune",
+  "project_id": "test-project",
+  "source": "paper.pdf",
+  "page": 3,
+  "text": "...",
+  "char_count": 900
+}

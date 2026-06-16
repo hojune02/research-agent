@@ -4,9 +4,22 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 
 from app.config import settings
 
-from app.schemas import LLMRequest, LLMResponse, UploadResponse
+from app.schemas import (
+    LLMRequest,
+    LLMResponse,
+    UploadResponse,
+    ParsePDFRequest,
+    ParsePDFResponse,
+    ParsePDFPreviewResponse,
+)
 from app.llm.client import generate_answer
-from app.tools.file_utils import build_upload_path, validate_pdf_upload
+from app.tools.file_utils import (
+    build_upload_path,
+    validate_pdf_upload,
+    get_uploaded_pdf_path,
+)
+
+from app.rag.pdf_parser import parse_pdf_into_chunks
 
 app = FastAPI(
     title="Soundable Research Agent",
@@ -96,3 +109,103 @@ def upload_raw_pdf(
 
     finally:
         file.file.close()
+
+@app.post("/parse/pdf", response_model=ParsePDFResponse)
+def parse_uploaded_pdf(request: ParsePDFRequest):
+    """
+    Phase 4 endpoint.
+
+    Takes an already-uploaded PDF and parses it into text chunks.
+    Does NOT store chunks in a vector database yet.
+    """
+    try:
+        pdf_path = get_uploaded_pdf_path(
+            upload_dir=settings.UPLOAD_DIR,
+            user_id=request.user_id,
+            project_id=request.project_id,
+            filename=request.filename,
+        )
+
+        if not pdf_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Uploaded PDF not found: {pdf_path}",
+            )
+
+        pages_parsed, chunks = parse_pdf_into_chunks(
+            pdf_path=pdf_path,
+            user_id=request.user_id,
+            project_id=request.project_id,
+            source_filename=pdf_path.name,
+            chunk_size=settings.CHUNK_SIZE,
+            chunk_overlap=settings.CHUNK_OVERLAP,
+        )
+
+        return ParsePDFResponse(
+            status="parsed",
+            user_id=request.user_id,
+            project_id=request.project_id,
+            filename=pdf_path.name,
+            pages_parsed=pages_parsed,
+            chunks_created=len(chunks),
+            chunks=chunks,
+        )
+
+    except HTTPException:
+        raise
+
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to parse PDF: {exc}")
+    
+@app.post("/parse/pdf/preview", response_model=ParsePDFPreviewResponse)
+def preview_parse_uploaded_pdf(request: ParsePDFRequest):
+    """
+    Phase 4 preview endpoint.
+
+    Parses PDF but returns only the first few chunks.
+    Useful for debugging large PDFs.
+    """
+    try:
+        pdf_path = get_uploaded_pdf_path(
+            upload_dir=settings.UPLOAD_DIR,
+            user_id=request.user_id,
+            project_id=request.project_id,
+            filename=request.filename,
+        )
+
+        if not pdf_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Uploaded PDF not found: {pdf_path}",
+            )
+
+        pages_parsed, chunks = parse_pdf_into_chunks(
+            pdf_path=pdf_path,
+            user_id=request.user_id,
+            project_id=request.project_id,
+            source_filename=pdf_path.name,
+            chunk_size=settings.CHUNK_SIZE,
+            chunk_overlap=settings.CHUNK_OVERLAP,
+        )
+
+        return ParsePDFPreviewResponse(
+            status="parsed_preview",
+            user_id=request.user_id,
+            project_id=request.project_id,
+            filename=pdf_path.name,
+            pages_parsed=pages_parsed,
+            chunks_created=len(chunks),
+            preview_chunks=chunks[:5],
+        )
+
+    except HTTPException:
+        raise
+
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to parse PDF preview: {exc}")

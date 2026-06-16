@@ -19,11 +19,14 @@ class Settings(BaseSettings):
     SQLITE_PATH: str = str(PROJECT_ROOT / "data" / "sqlite" / "paperops.db")
 
     TOP_K: int = 5
-
+    CHUNK_SIZE: int = 900
+    CHUNK_OVERLAP: int = 150
+    
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",
     )
+
 
 
 settings = Settings()
