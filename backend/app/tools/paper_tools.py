@@ -10,6 +10,8 @@ from app.llm.client import generate_answer
 from app.rag.vectorstore import search_chunks
 from app.schemas import AskMetrics, AskResponse, Citation, SearchResult
 
+from app.metrics.tracker import save_latest_metrics
+
 
 def retrieve_context(
     user_id: str,
@@ -53,7 +55,7 @@ def _no_context_response(
 ) -> AskResponse:
     total_latency_ms = int((time.time() - total_start) * 1000)
 
-    return AskResponse(
+    response = AskResponse(
         answer="I do not know from the uploaded documents.",
         citations=[],
         metrics=AskMetrics(
@@ -66,6 +68,9 @@ def _no_context_response(
             estimated_tokens_per_second=0.0,
         ),
     )
+
+    save_latest_metrics(response.metrics.model_dump())
+    return response
 
 
 def _grounded_generate(
@@ -109,7 +114,7 @@ def _grounded_generate(
 
     total_latency_ms = int((time.time() - total_start) * 1000)
 
-    return AskResponse(
+    response = AskResponse(
         answer=llm_result["text"],
         citations=make_citations(results),
         metrics=AskMetrics(
@@ -122,6 +127,9 @@ def _grounded_generate(
             estimated_tokens_per_second=llm_result["estimated_tokens_per_second"],
         ),
     )
+
+    save_latest_metrics(response.metrics.model_dump())
+    return response
 
 
 def compare_documents(

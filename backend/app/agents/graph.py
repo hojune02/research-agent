@@ -15,6 +15,8 @@ from app.llm.client import generate_answer
 from app.tools.paper_tools import retrieve_context, save_memory
 from app.schemas import AskMetrics, AskResponse, Citation
 
+from app.metrics.tracker import save_latest_metrics
+
 
 def planner_node(state: AgentState) -> AgentState:
     """
@@ -258,7 +260,7 @@ def run_agent(
 
     total_latency_ms = int((time.time() - total_start) * 1000)
 
-    return AskResponse(
+    response = AskResponse(
         answer=final_state.get(
             "final_answer",
             "I do not know from the uploaded documents.",
@@ -277,6 +279,9 @@ def run_agent(
             ),
         ),
     )
+
+    save_latest_metrics(response.metrics.model_dump())
+    return response
 
 def run_agent_debug(
     user_id: str,

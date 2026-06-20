@@ -54,6 +54,8 @@ from app.tools.paper_tools import (
 from app.db.models import init_db
 from app.db.memory import create_memory, delete_memory, list_memories
 
+from app.metrics.tracker import get_latest_metrics
+
 app = FastAPI(
     title="Soundable Research Agent",
     description="Local multi-user research automation agent with RAG, tool calling, memory, and local LLM serving.",
@@ -530,3 +532,10 @@ def remove_project_memory(memory_id: int):
         status="deleted",
         deleted_id=memory_id,
     )
+
+@app.get("/metrics/latest")
+def latest_metrics():
+    """
+    Returns metrics from the latest LLM/RAG request.
+    """
+    return get_latest_metrics()

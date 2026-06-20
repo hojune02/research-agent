@@ -1,0 +1,44 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    environment:
+      - UPLOAD_DIR=/app/data/uploads
+      - CHROMA_PATH=/app/data/chroma
+      - SQLITE_PATH=/app/data/sqlite/paperops.db
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "7862:7862"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+
+  # Optional GPU vLLM service.
+  # This is commented out because it requires a CUDA Linux machine
+  # with NVIDIA drivers and container GPU support.
+  #
+  # vllm:
+  #   image: vllm/vllm-openai:latest
+  #   ports:
+  #     - "8001:8000"
+  #   volumes:
+  #     - ~/.cache/huggingface:/root/.cache/huggingface
+  #   command: >
+  #     --model Qwen/Qwen2.5-7B-Instruct
+  #     --host 0.0.0.0
+  #     --port 8000
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - capabilities: ["gpu"]

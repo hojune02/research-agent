@@ -1,6 +1,6 @@
-# PaperOps Agent
+# Soundable Research Agent
 
-PaperOps Agent is a local multi-user research automation MVP.
+Soundable Research Agent is a local multi-user research automation MVP.
 
 The project is designed to demonstrate:
 
@@ -202,3 +202,37 @@ New endpoints:
 GET    /memory/{user_id}/{project_id}
 POST   /memory
 DELETE /memory/{memory_id}
+
+## Local llama.cpp Serving Mode
+
+Soundable Research Agent can use a local llama.cpp server through the OpenAI-compatible API provided by `llama-cpp-python`.
+
+### Install llama.cpp server dependencies
+
+For Mac Apple Silicon with Metal acceleration:
+
+```bash
+python -m pip install -r requirements-llama-metal.txt
+```
+
+## Download a GGUF model
+
+```bash
+mkdir -p models
+
+hf download Qwen/Qwen2.5-1.5B-Instruct-GGUF \
+  qwen2.5-1.5b-instruct-q4_k_m.gguf \
+  --local-dir models
+```
+
+## Start llama.cpp server
+
+```bash
+python -m llama_cpp.server \
+  --model models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
+  --model_alias local-model \
+  --host 0.0.0.0 \
+  --port 8002 \
+  --n_ctx 4096 \
+  --n_gpu_layers -1
+```
