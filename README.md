@@ -4,7 +4,7 @@ Soundable Research Agent is a local multi-user research automation MVP.
 
 The project is designed to demonstrate:
 
-- Local LLM serving with vLLM / llama.cpp
+- Local LLM serving with llama.cpp
 - OpenAI-compatible LLM backend abstraction
 - Document-based RAG and vector search
 - LangGraph agent workflows
@@ -46,7 +46,6 @@ Implemented:
 The LLM client is designed so the app can later switch between:
 
 - mock backend
-- vLLM OpenAI-compatible server
 - llama.cpp OpenAI-compatible server
 
 without changing application logic.
