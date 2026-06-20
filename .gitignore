@@ -21,3 +21,6 @@ data/sqlite/
 
 # models
 models/*
+# Local LLM model weights
+models/*.gguf
+models/
