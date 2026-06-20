@@ -18,3 +18,6 @@ data/sqlite/
 # OS / editor
 .DS_Store
 .vscode/
+
+# models
+models/*
