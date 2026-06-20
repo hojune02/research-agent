@@ -138,7 +138,7 @@ def search_chunks(
 
     raw_results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=top_k,
+        n_results=settings.RERANK_TOP_N if settings.ENABLE_RERANKER else top_k,
         where={
             "$and": [
                 {"user_id": {"$eq": user_id}},
@@ -171,6 +171,11 @@ def search_chunks(
                 score=score,
             )
         )
+    if settings.ENABLE_RERANKER:
+        print(f"[RAG] reranking {len(results)} candidates")
+        from app.rag.reranker import rerank_results
+        results = rerank_results(query=query, results=results, top_k=top_k)
+        print(f"[RAG] reranked down to {len(results)} results")
 
     retrieval_latency_ms = int((time.time() - start_time) * 1000)
     return results, retrieval_latency_ms

@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     CHROMA_COLLECTION: str = "research_documents"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 
+
+    ENABLE_RERANKER: bool = False
+    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    RERANK_TOP_N: int = 20
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",
