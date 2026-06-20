@@ -300,10 +300,10 @@ def ask_docs_stream(user_id: str, project_id: str, question: str, top_k: int):
         yield f"[ERROR] {exc}", citations, metadata
 
 
-with gr.Blocks(title="Soundable Research Agent") as demo:
+with gr.Blocks(title=" Research Agent") as demo:
     gr.Markdown(
         """
-        # Soundable Research Agent
+        #  Research Agent
 
         Local multi-user research automation MVP with:
         - PDF upload

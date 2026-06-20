@@ -1,6 +1,6 @@
-# Soundable Research Agent
+# Research Agent
 
-Soundable Research Agent is a local multi-user research automation MVP.
+Research Agent is a local multi-user research automation MVP.
 
 The project is designed to demonstrate:
 
@@ -212,7 +212,7 @@ DELETE /memory/{memory_id}
 
 ## Local llama.cpp Serving Mode
 
-Soundable Research Agent can use a local llama.cpp server through the OpenAI-compatible API provided by `llama-cpp-python`.
+ Research Agent can use a local llama.cpp server through the OpenAI-compatible API provided by `llama-cpp-python`.
 
 ### Install llama.cpp server dependencies
 

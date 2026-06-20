@@ -60,7 +60,7 @@ from fastapi.responses import StreamingResponse
 from app.rag.qa import stream_answer_question
 
 app = FastAPI(
-    title="Soundable Research Agent",
+    title=" Research Agent",
     description="Local multi-user research automation agent with RAG, tool calling, memory, and local LLM serving.",
     version="0.1.0",
 )
