@@ -21,7 +21,7 @@ def build_context_from_chunks(chunks: list[SearchResult]) -> str:
 
 def build_qa_prompt(question: str) -> str:
     return f"""
-You are PaperOps Agent, a careful research assistant.
+You are Research Agent, a careful research assistant.
 
 Answer the user's question using only the provided context.
 
@@ -39,7 +39,7 @@ User question:
 
 def build_compare_prompt(question: str) -> str:
     return f"""
-You are PaperOps Agent.
+You are Research Agent.
 
 Compare the uploaded papers using only the retrieved context.
 
@@ -60,7 +60,7 @@ User request:
 
 def build_lit_review_prompt(topic: str) -> str:
     return f"""
-You are PaperOps Agent.
+You are Research Agent.
 
 Write a mini literature review using only the retrieved context.
 

@@ -8,7 +8,7 @@ from ..config import settings
 
 
 SYSTEM_PROMPT = """
-You are PaperOps Agent, a careful research assistant.
+You are Research Agent, a careful research assistant.
 
 Rules:
 - Answer using the provided context when context is available.

@@ -183,7 +183,7 @@ def generate_literature_review(
 
 def build_extract_insights_prompt(focus: str) -> str:
     return f"""
-You are PaperOps Agent, a research automation assistant.
+You are Research Agent, a research automation assistant.
 
 Extract structured research insights from the uploaded papers using only the provided context.
 

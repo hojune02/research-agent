@@ -3,7 +3,7 @@ from app.db.session import get_connection
 
 def init_db() -> None:
     """
-    Initialize SQLite tables for PaperOps Agent.
+    Initialize SQLite tables for Research Agent.
     """
     conn = get_connection()
 

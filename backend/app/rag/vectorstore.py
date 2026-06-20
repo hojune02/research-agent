@@ -39,7 +39,7 @@ def get_documents_collection() -> Collection:
     return client.get_or_create_collection(
         name=settings.CHROMA_COLLECTION,
         metadata={
-            "description": "PaperOps document chunks for multi-user RAG",
+            "description": "Research document chunks for multi-user RAG",
         },
     )
 
