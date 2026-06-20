@@ -31,6 +31,7 @@ pip install -r backend/requirements.txt
 
 cd backend
 uvicorn app.main:app --reload --port 8000
+```
 
 ## Phase 2 Status
 
@@ -64,6 +65,7 @@ Endpoint:
 
 ```http
 POST /upload/raw
+```
 
 ## Phase 4 Status
 
@@ -88,6 +90,7 @@ Each chunk includes:
   "text": "...",
   "char_count": 900
 }
+```
 
 ## Phase 5 Status
 
@@ -117,6 +120,7 @@ Vector DB record structure:
   },
   "embedding": "[384-dimensional vector]"
 }
+```
 
 ## Phase 6 Status
 
@@ -139,6 +143,7 @@ query
   -> Chroma top-k search
   -> metadata filter by user_id/project_id
   -> retrieved chunks
+```
 
 ## Phase 7 Status
 
@@ -163,6 +168,7 @@ START
   -> citation_check_node
   -> memory_stub_node
   -> END
+```
 
 ## Phase 8 Status
 
@@ -181,6 +187,7 @@ GET  /tools
 POST /compare
 POST /lit-review
 POST /extract-insights
+```
 
 ## Phase 9 Status
 
@@ -202,6 +209,7 @@ New endpoints:
 GET    /memory/{user_id}/{project_id}
 POST   /memory
 DELETE /memory/{memory_id}
+```
 
 ## Local llama.cpp Serving Mode
 
