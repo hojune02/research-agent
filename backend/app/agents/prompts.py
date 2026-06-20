@@ -1,20 +1,28 @@
 from app.schemas import SearchResult
 
 
+from app.config import settings
+from app.schemas import SearchResult
+
+
 def build_context_from_chunks(chunks: list[SearchResult]) -> str:
-    """
-    Convert retrieved chunks into a context block for the LLM.
-    """
     context_parts: list[str] = []
+    current_chars = 0
 
     for idx, chunk in enumerate(chunks, start=1):
-        context_parts.append(
+        part = (
             f"[Source {idx}]\n"
             f"file: {chunk.source}\n"
             f"page: {chunk.page}\n"
             f"chunk_id: {chunk.chunk_id}\n"
             f"text:\n{chunk.text}"
         )
+
+        if current_chars + len(part) > settings.MAX_CONTEXT_CHARS:
+            break
+
+        context_parts.append(part)
+        current_chars += len(part)
 
     return "\n\n".join(context_parts)
 

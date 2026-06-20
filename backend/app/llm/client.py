@@ -53,6 +53,60 @@ def _mock_generate(prompt: str, context: str = "") -> dict[str, Any]:
         "estimated_tokens_per_second": 0.0,
     }
 
+from collections.abc import Generator
+
+
+def stream_answer(prompt: str, context: str = "") -> Generator[str, None, None]:
+    """
+    Streams answer tokens from an OpenAI-compatible LLM backend.
+
+    Works with:
+    - llama.cpp server
+    - vLLM OpenAI-compatible server
+    - other OpenAI-compatible chat servers
+    """
+    if settings.MOCK_LLM:
+        mock_text = _mock_generate(prompt=prompt, context=context)["text"]
+
+        for word in mock_text.split():
+            yield word + " "
+
+        return
+
+    client = OpenAI(
+        base_url=settings.LLM_BASE_URL,
+        api_key=settings.LLM_API_KEY,
+    )
+
+    try:
+        stream = client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT.strip()},
+                {
+                    "role": "user",
+                    "content": f"Context:\n{context}\n\nUser question:\n{prompt}",
+                },
+            ],
+            temperature=settings.LLM_TEMPERATURE,
+            max_tokens=settings.LLM_MAX_TOKENS,
+            stream=True,
+        )
+
+        for event in stream:
+            delta = event.choices[0].delta.content
+
+            if delta:
+                yield delta
+
+    except (APIConnectionError, APITimeoutError) as exc:
+        yield (
+            "\n\n[ERROR] Could not connect to the configured LLM server. "
+            "Check LLM_BASE_URL, or set MOCK_LLM=true in .env."
+        )
+
+    except APIStatusError as exc:
+        yield f"\n\n[ERROR] LLM server returned status={exc.status_code}."
 
 def generate_answer(prompt: str, context: str = "") -> dict[str, Any]:
     """
@@ -81,16 +135,14 @@ def generate_answer(prompt: str, context: str = "") -> dict[str, Any]:
         response = client.chat.completions.create(
             model=settings.LLM_MODEL,
             messages=[
-                {
-                    "role": "system",
-                    "content": SYSTEM_PROMPT.strip(),
-                },
+                {"role": "system", "content": SYSTEM_PROMPT.strip()},
                 {
                     "role": "user",
                     "content": f"Context:\n{context}\n\nUser question:\n{prompt}",
                 },
             ],
-            temperature=0.2,
+            temperature=settings.LLM_TEMPERATURE,
+            max_tokens=settings.LLM_MAX_TOKENS,
         )
 
         text = response.choices[0].message.content or ""

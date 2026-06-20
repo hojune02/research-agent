@@ -56,6 +56,9 @@ from app.db.memory import create_memory, delete_memory, list_memories
 
 from app.metrics.tracker import get_latest_metrics
 
+from fastapi.responses import StreamingResponse
+from app.rag.qa import stream_answer_question
+
 app = FastAPI(
     title="Soundable Research Agent",
     description="Local multi-user research automation agent with RAG, tool calling, memory, and local LLM serving.",
@@ -539,3 +542,24 @@ def latest_metrics():
     Returns metrics from the latest LLM/RAG request.
     """
     return get_latest_metrics()
+
+@app.post("/ask/stream")
+def ask_documents_stream(request: AskRequest):
+    """
+    Streams a citation-grounded RAG answer token-by-token.
+
+    Used by Gradio for live output.
+    """
+    try:
+        return StreamingResponse(
+            stream_answer_question(
+                user_id=request.user_id,
+                project_id=request.project_id,
+                question=request.question,
+                top_k=request.top_k,
+            ),
+            media_type="application/x-ndjson",
+        )
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Streaming ask failed: {exc}")

@@ -17,6 +17,9 @@ from app.schemas import AskMetrics, AskResponse, Citation
 
 from app.metrics.tracker import save_latest_metrics
 
+import time
+from app.db.response_cache import make_cache_key, get_cached_response, save_cached_response
+
 
 def planner_node(state: AgentState) -> AgentState:
     """
@@ -256,6 +259,42 @@ def run_agent(
         "top_k": top_k or settings.TOP_K,
     }
 
+    cache_lookup_start = time.time()
+
+    cache_key = make_cache_key(
+        user_id=user_id,
+        project_id=project_id,
+        question=user_query,
+        top_k=top_k or settings.TOP_K,
+        llm_model=settings.LLM_MODEL,
+        max_tokens=settings.LLM_MAX_TOKENS,
+    )
+
+    cached = get_cached_response(cache_key)
+    cache_lookup_latency_ms = int((time.time() - cache_lookup_start) * 1000)
+
+    if cached is not None:
+        total_latency_ms = int((time.time() - total_start) * 1000)
+
+        response = AskResponse(
+            answer=cached["answer"],
+            citations=[Citation(**citation) for citation in cached["citations"]],
+            metrics=AskMetrics(
+                retrieval_latency_ms=0,
+                generation_latency_ms=0,
+                total_latency_ms=total_latency_ms,
+                llm_backend="cache",
+                llm_model=settings.LLM_MODEL,
+                mock=settings.MOCK_LLM,
+                estimated_tokens_per_second=0.0,
+                cache_hit=True,
+                cache_lookup_latency_ms=cache_lookup_latency_ms,
+            ),
+        )
+
+        save_latest_metrics(response.metrics.model_dump())
+        return response
+
     final_state = agent_graph.invoke(initial_state)
 
     total_latency_ms = int((time.time() - total_start) * 1000)
@@ -278,6 +317,16 @@ def run_agent(
                 0.0,
             ),
         ),
+    )
+
+    save_cached_response(
+        cache_key=cache_key,
+        user_id=user_id,
+        project_id=project_id,
+        question=user_query,
+        answer=response.answer,
+        citations=[citation.model_dump() for citation in response.citations],
+        metrics=response.metrics.model_dump(),
     )
 
     save_latest_metrics(response.metrics.model_dump())

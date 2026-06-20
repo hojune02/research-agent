@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 900
     CHUNK_OVERLAP: int = 150
 
+    LLM_MAX_TOKENS: int = 800
+    LLM_TEMPERATURE: float = 0.2
+    MAX_CONTEXT_CHARS: int = 3500
+
     CHROMA_COLLECTION: str = "research_documents"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 

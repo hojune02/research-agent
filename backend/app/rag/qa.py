@@ -5,6 +5,12 @@ from app.llm.client import generate_answer
 from app.rag.vectorstore import search_chunks
 from app.schemas import AskMetrics, AskResponse, Citation, SearchResult
 
+from collections.abc import Generator
+import json
+
+from app.llm.client import stream_answer
+from app.rag.vectorstore import search_chunks
+
 
 def build_context(results: list[SearchResult]) -> str:
     """
@@ -129,3 +135,65 @@ def answer_question(
             estimated_tokens_per_second=llm_result["estimated_tokens_per_second"],
         ),
     )
+
+def stream_answer_question(
+    user_id: str,
+    project_id: str,
+    question: str,
+    top_k: int | None = None,
+) -> Generator[str, None, None]:
+    """
+    Streams a RAG answer as Server-Sent Events-style JSON lines.
+
+    Each yielded line is a JSON object followed by newline.
+    """
+    k = top_k or settings.TOP_K
+
+    results, retrieval_latency_ms = search_chunks(
+        user_id=user_id,
+        project_id=project_id,
+        query=question,
+        top_k=k,
+    )
+
+    citations = [
+        {
+            "source": result.source,
+            "page": result.page,
+            "chunk_id": result.chunk_id,
+            "text": result.text[:500],
+        }
+        for result in results
+    ]
+
+    # First event: metadata and citations
+    yield json.dumps(
+        {
+            "type": "metadata",
+            "retrieval_latency_ms": retrieval_latency_ms,
+            "citations": citations,
+        }
+    ) + "\n"
+
+    if not results:
+        yield json.dumps(
+            {
+                "type": "token",
+                "text": "I do not know from the uploaded documents.",
+            }
+        ) + "\n"
+        yield json.dumps({"type": "done"}) + "\n"
+        return
+
+    context = build_context(results)
+    prompt = build_rag_prompt(question)
+
+    for token in stream_answer(prompt=prompt, context=context):
+        yield json.dumps(
+            {
+                "type": "token",
+                "text": token,
+            }
+        ) + "\n"
+
+    yield json.dumps({"type": "done"}) + "\n"

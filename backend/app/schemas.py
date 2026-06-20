@@ -126,6 +126,8 @@ class AskMetrics(BaseModel):
     llm_model: str
     mock: bool
     estimated_tokens_per_second: float
+    cache_hit: bool = False
+    cache_lookup_latency_ms: int = 0
 
 
 class AskResponse(BaseModel):

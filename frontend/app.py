@@ -5,6 +5,9 @@ from typing import Any
 import gradio as gr
 import requests
 
+import json
+import time
+
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
@@ -219,6 +222,82 @@ def get_latest_metrics():
         return _safe_json(response)
     except Exception as exc:
         return {"error": str(exc)}
+    
+def ask_docs_stream(user_id: str, project_id: str, question: str, top_k: int):
+    """
+    Gradio streaming function.
+
+    It calls the FastAPI /ask/stream endpoint and yields partial answer text.
+    """
+    if not user_id or not project_id or not question:
+        yield "user_id, project_id, and question are required.", {}, {}
+        return
+
+    answer = ""
+    citations = []
+    metadata = {}
+
+    start_time = time.time()
+    first_token_ms = None
+
+    try:
+        with requests.post(
+            f"{BACKEND_URL}/ask/stream",
+            json={
+                "user_id": user_id,
+                "project_id": project_id,
+                "question": question,
+                "top_k": top_k,
+            },
+            stream=True,
+            timeout=300,
+        ) as response:
+            response.raise_for_status()
+
+            for line in response.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+
+                event = json.loads(line)
+                event_type = event.get("type")
+
+                if event_type == "metadata":
+                    citations = event.get("citations", [])
+                    metadata = {
+                        "retrieval_latency_ms": event.get("retrieval_latency_ms"),
+                        "streaming": True,
+                    }
+
+                    yield answer, citations, metadata
+
+                elif event_type == "token":
+                    if first_token_ms is None:
+                        first_token_ms = int((time.time() - start_time) * 1000)
+
+                    answer += event.get("text", "")
+
+                    metrics = {
+                        **metadata,
+                        "time_to_first_token_ms": first_token_ms,
+                        "elapsed_ms": int((time.time() - start_time) * 1000),
+                    }
+
+                    yield answer, citations, metrics
+
+                elif event_type == "done":
+                    metrics = {
+                        **metadata,
+                        "time_to_first_token_ms": first_token_ms,
+                        "total_stream_time_ms": int((time.time() - start_time) * 1000),
+                        "answer_chars": len(answer),
+                        "answer_words": len(answer.split()),
+                    }
+
+                    yield answer, citations, metrics
+                    return
+
+    except Exception as exc:
+        yield f"[ERROR] {exc}", citations, metadata
 
 
 with gr.Blocks(title="Soundable Research Agent") as demo:
@@ -276,13 +355,23 @@ with gr.Blocks(title="Soundable Research Agent") as demo:
 
     with gr.Tab("3. Ask"):
         question = gr.Textbox(label="Question", lines=3)
-        ask_btn = gr.Button("Ask")
+
+        with gr.Row():
+            ask_btn = gr.Button("Ask")
+            ask_stream_btn = gr.Button("Ask Streaming")
+
         answer_output = gr.Markdown(label="Answer")
         citations_output = gr.JSON(label="Citations")
         metrics_output = gr.JSON(label="Metrics")
 
         ask_btn.click(
             ask_docs,
+            inputs=[user_id, project_id, question, top_k],
+            outputs=[answer_output, citations_output, metrics_output],
+        )
+
+        ask_stream_btn.click(
+            ask_docs_stream,
             inputs=[user_id, project_id, question, top_k],
             outputs=[answer_output, citations_output, metrics_output],
         )

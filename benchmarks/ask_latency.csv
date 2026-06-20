@@ -1,0 +1,11 @@
+label,run,wall_time_ms,retrieval_latency_ms,generation_latency_ms,total_latency_ms,estimated_tokens_per_second,llm_backend,llm_model,mock,answer_chars,answer_words,num_citations
+qwen2_5_7b_q4_baseline,1,17752,17686,0,17707,0.0,none,none,False,42,8,0
+qwen2_5_7b_q4_baseline,2,75,66,0,70,0.0,none,none,False,42,8,0
+qwen2_5_7b_q4_baseline,3,38,31,0,35,0.0,none,none,False,42,8,0
+qwen2_5_7b_q4_max_tokens_800,1,114,77,0,89,0.0,none,none,False,42,8,0
+qwen2_5_7b_q4_max_tokens_800,2,25,18,0,21,0.0,none,none,False,42,8,0
+qwen2_5_7b_q4_max_tokens_800,3,25,19,0,22,0.0,none,none,False,42,8,0
+cache_miss_1_5b_long_answer,1,18048,18017,0,18028,0.0,none,none,False,42,8,0
+cache_hit_1_5b_long_answer,1,11,0,0,1,0.0,cache,local-model,False,42,8,0
+cache_hit_1_5b_long_answer,2,3,0,0,0,0.0,cache,local-model,False,42,8,0
+cache_hit_1_5b_long_answer,3,3,0,0,0,0.0,cache,local-model,False,42,8,0
