@@ -1,3 +1,4 @@
+import math
 from functools import lru_cache
 
 from sentence_transformers import CrossEncoder
@@ -9,6 +10,9 @@ from app.schemas import SearchResult
 @lru_cache(maxsize=1)
 def get_reranker() -> CrossEncoder:
     return CrossEncoder(settings.RERANKER_MODEL)
+
+def _sigmoid(x: float) -> float:
+    return 1.0 / (1.0 + math.exp(-x))
 
 
 def rerank_results(query: str, results: list[SearchResult], top_k: int) -> list[SearchResult]:
@@ -26,7 +30,10 @@ def rerank_results(query: str, results: list[SearchResult], top_k: int) -> list[
     reranked = []
 
     for result, score in scored[:top_k]:
-        result.score = round(float(score), 4)
+         # Normalize raw cross-encoder logits to (0, 1) so that scores are
+        # comparable with the distance-derived similarity used when the
+        # reranker is disabled. Sorting order is preserved (sigmoid is monotonic).
+        result.score = round(_sigmoid(float(score)), 4)
         reranked.append(result)
 
     return reranked

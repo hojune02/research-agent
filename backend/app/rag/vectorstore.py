@@ -131,6 +131,7 @@ def search_chunks(
     - This prevents cross-user document leakage.
     - Returns results plus retrieval latency in ms.
     """
+    # Invariant: SearchResult.score is always in (0, 1], higher = more relevant, in both reranked and non-reranked modes.
     start_time = time.time()
 
     collection = get_documents_collection()
