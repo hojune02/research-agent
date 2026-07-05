@@ -39,6 +39,9 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
     )
 
+    RETRIEVAL_MIN_SCORE: float = 0.25
+    MAX_RETRIEVAL_ATTEMPTS: int = 2
+
 
 
 settings = Settings()
