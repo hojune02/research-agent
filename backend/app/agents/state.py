@@ -22,9 +22,14 @@ class AgentState(TypedDict, total=False):
     # Planning
     task_type: TaskType
 
+    # Memory (read path)
+    memory_context: str
+
     # Retrieval
     retrieved_chunks: list[SearchResult]
     retrieval_latency_ms: int
+    retrieval_attempts: int
+    active_query: str
 
     # Generation
     draft_answer: str
@@ -41,7 +46,7 @@ class AgentState(TypedDict, total=False):
     mock: bool
     estimated_tokens_per_second: float
 
-    # Diagnostics / future memory
+    # Diagnostics / memory writes
     warnings: list[str]
     memory_updates: list[str]
 

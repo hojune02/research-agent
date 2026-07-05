@@ -1,6 +1,3 @@
-from app.schemas import SearchResult
-
-
 from app.config import settings
 from app.schemas import SearchResult
 
@@ -37,7 +34,10 @@ Rules:
 - If the answer is not supported by the context, say: "I do not know from the uploaded documents."
 - Do not use outside knowledge.
 - Be concise but specific.
-- Mention source filenames and pages when useful.
+- After each claim, cite the supporting source inline using its bracket tag, e.g. [Source 2].
+- Only cite sources whose text actually supports the claim.
+- If a "Known project context" section is present, treat it as background from
+  earlier sessions; never cite it as a source.
 - Do not invent citations.
 
 User question:
@@ -59,7 +59,10 @@ Focus on:
 - limitations
 - open questions
 
-If the context is insufficient, say so clearly.
+Rules:
+- After each claim, cite the supporting source inline using its bracket tag, e.g. [Source 2].
+- Only cite sources whose text actually supports the claim.
+- If the context is insufficient, say so clearly.
 
 User request:
 {question}
@@ -79,7 +82,10 @@ Required structure:
 4. Limitations
 5. Open research directions
 
-If the context is insufficient, say so clearly.
+Rules:
+- After each claim, cite the supporting source inline using its bracket tag, e.g. [Source 2].
+- Only cite sources whose text actually supports the claim.
+- If the context is insufficient, say so clearly.
 
 Topic:
 {topic}

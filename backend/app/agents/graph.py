@@ -1,3 +1,4 @@
+import json
 import time
 
 from langgraph.graph import END, START, StateGraph
@@ -10,15 +11,19 @@ from app.agents.prompts import (
 )
 from app.agents.state import AgentState, TaskType
 from app.config import settings
-from app.llm.client import generate_answer
-# Phase 7: from app.rag.vectorstore import search_chunks
-from app.tools.paper_tools import retrieve_context, save_memory
-from app.schemas import AskMetrics, AskResponse, Citation
-
+from app.db.memory import list_memories
+from app.db.response_cache import (
+    get_cached_response,
+    make_cache_key,
+    save_cached_response,
+)
+from app.llm.client import generate_answer, stream_answer
 from app.metrics.tracker import save_latest_metrics
+from app.rag.citation_filter import filter_citations
+from app.schemas import AskMetrics, AskResponse, Citation
+from app.tools.paper_tools import retrieve_context, save_memory
 
-import time
-from app.db.response_cache import make_cache_key, get_cached_response, save_cached_response
+REFUSAL_TEXT = "I do not know from the uploaded documents."
 
 
 def planner_node(state: AgentState) -> AgentState:
@@ -52,7 +57,37 @@ def planner_node(state: AgentState) -> AgentState:
         "task_type": task_type,
         "warnings": [],
         "memory_updates": [],
+        "retrieval_attempts": 0,
+        "active_query": "",
+        "memory_context": "",
     }
+
+
+def load_memory_node(state: AgentState) -> AgentState:
+    """
+    Memory read path.
+
+    Loads recent project memory from SQLite and formats it as a background
+    block that synthesize_node prepends to the retrieved context.
+    """
+    try:
+        memories = list_memories(
+            user_id=state["user_id"],
+            project_id=state["project_id"],
+            limit=5,
+        )
+    except Exception:
+        return {"memory_context": ""}
+
+    if not memories:
+        return {"memory_context": ""}
+
+    # list_memories returns newest first (ORDER BY id DESC);
+    # reverse so the block reads chronologically.
+    lines = [f"- {memory.memory_item}" for memory in reversed(memories)]
+    block = "Known project context from earlier sessions:\n" + "\n".join(lines)
+
+    return {"memory_context": block[:800]}
 
 
 def retrieve_node(state: AgentState) -> AgentState:
@@ -60,39 +95,98 @@ def retrieve_node(state: AgentState) -> AgentState:
     Tool-like retrieval node.
 
     Calls Chroma semantic search with strict user_id/project_id filtering.
+    Uses active_query (set by rewrite_query_node on retries) when present.
     """
+    attempts = state.get("retrieval_attempts", 0) + 1
+
     if state.get("task_type") == "unknown":
         return {
             "retrieved_chunks": [],
             "retrieval_latency_ms": 0,
+            "retrieval_attempts": attempts,
             "warnings": state.get("warnings", []) + ["Empty or unknown query."],
         }
 
+    query = state.get("active_query") or state["user_query"]
+
     results, retrieval_latency_ms = retrieve_context(
-    user_id=state["user_id"],
-    project_id=state["project_id"],
-    query=state["user_query"],
-    top_k=state.get("top_k", settings.TOP_K),
-)
+        user_id=state["user_id"],
+        project_id=state["project_id"],
+        query=query,
+        top_k=state.get("top_k", settings.TOP_K),
+    )
 
     return {
         "retrieved_chunks": results,
         "retrieval_latency_ms": retrieval_latency_ms,
+        "retrieval_attempts": attempts,
     }
+
+
+def route_after_retrieve(state: AgentState) -> str:
+    """
+    Conditional edge: decide whether retrieval was strong enough.
+
+    Weak retrieval (no chunks, or best score below RETRIEVAL_MIN_SCORE)
+    triggers one bounded query-rewrite retry; otherwise proceed to
+    synthesis, where the empty-chunks branch handles final abstention.
+    """
+    if state.get("task_type") == "unknown":
+        return "synthesize"
+
+    chunks = state.get("retrieved_chunks", [])
+    attempts = state.get("retrieval_attempts", 1)
+
+    top_score = max((chunk.score or 0.0) for chunk in chunks) if chunks else 0.0
+    weak = (not chunks) or (top_score < settings.RETRIEVAL_MIN_SCORE)
+
+    if weak and attempts < settings.MAX_RETRIEVAL_ATTEMPTS:
+        return "rewrite_query"
+
+    return "synthesize"
+
+
+def rewrite_query_node(state: AgentState) -> AgentState:
+    """
+    Rewrites the query once when retrieval confidence is low.
+    """
+    rewrite_prompt = (
+        "Rewrite the following search query to maximize recall in a "
+        "semantic search over academic PDF chunks. Expand abbreviations, "
+        "add likely synonyms, keep it under 30 words. "
+        "Return only the rewritten query.\n\n"
+        f"Query: {state['user_query']}"
+    )
+
+    try:
+        result = generate_answer(prompt=rewrite_prompt, context="")
+        rewritten = (result.get("text") or "").strip().strip('"')
+    except RuntimeError:
+        rewritten = ""
+
+    if not rewritten:
+        rewritten = state["user_query"]
+
+    warnings = state.get("warnings", []) + [
+        f"Low retrieval confidence; retried with rewritten query: {rewritten[:120]}"
+    ]
+
+    return {"active_query": rewritten, "warnings": warnings}
 
 
 def synthesize_node(state: AgentState) -> AgentState:
     """
     Generation node.
 
-    Builds context from retrieved chunks and calls the LLM client.
+    Builds context from retrieved chunks (plus project memory background)
+    and calls the LLM client.
     """
     chunks = state.get("retrieved_chunks", [])
 
     if not chunks:
         return {
-            "draft_answer": "I do not know from the uploaded documents.",
-            "final_answer": "I do not know from the uploaded documents.",
+            "draft_answer": REFUSAL_TEXT,
+            "final_answer": REFUSAL_TEXT,
             "generation_latency_ms": 0,
             "llm_backend": "none",
             "llm_model": "none",
@@ -110,6 +204,10 @@ def synthesize_node(state: AgentState) -> AgentState:
         prompt = build_qa_prompt(state["user_query"])
 
     context = build_context_from_chunks(chunks)
+
+    memory_context = state.get("memory_context", "")
+    if memory_context:
+        context = f"{memory_context}\n\n{context}"
 
     llm_result = generate_answer(
         prompt=prompt,
@@ -129,43 +227,37 @@ def synthesize_node(state: AgentState) -> AgentState:
 
 def citation_check_node(state: AgentState) -> AgentState:
     """
-    Citation checker node.
+    Citation verification node.
 
-    MVP behavior:
-    - Convert retrieved chunks into Citation objects.
-    - If no retrieved chunks, no citations.
-    - Ensure final answer exists.
+    Parses inline [Source n] markers from the draft answer and keeps only
+    the chunks the answer actually cited. Refusals carry no citations.
     """
     chunks = state.get("retrieved_chunks", [])
-
-    citations: list[Citation] = []
-
-    for chunk in chunks:
-        citations.append(
-            Citation(
-                source=chunk.source,
-                page=chunk.page,
-                chunk_id=chunk.chunk_id,
-                text=chunk.text[:500],
-            )
-        )
-
     draft_answer = state.get("draft_answer", "")
-
     warnings = state.get("warnings", [])
 
-    if chunks and not citations:
-        warnings.append("Retrieved chunks existed, but no citations were created.")
-
     if not chunks:
-        final_answer = "I do not know from the uploaded documents."
-    else:
-        final_answer = draft_answer or "I do not know from the uploaded documents."
+        return {
+            "citations": [],
+            "final_answer": REFUSAL_TEXT,
+            "warnings": warnings,
+        }
+
+    final_answer = draft_answer or REFUSAL_TEXT
+
+    if final_answer.strip().startswith(REFUSAL_TEXT):
+        return {
+            "citations": [],
+            "final_answer": final_answer,
+            "warnings": warnings,
+        }
+
+    citations, citation_warnings = filter_citations(final_answer, chunks)
 
     return {
         "citations": citations,
         "final_answer": final_answer,
-        "warnings": warnings,
+        "warnings": warnings + citation_warnings,
     }
 
 
@@ -173,32 +265,21 @@ def memory_update_node(state: AgentState) -> AgentState:
     """
     Persistent memory node.
 
-    Saves useful project-level memory to SQLite.
+    Saves a compact Q/A record for non-refusal answers, so that
+    load_memory_node has something useful to read back next session.
     """
     memory_updates: list[str] = []
 
-    task_type = state.get("task_type", "unknown")
     user_id = state["user_id"]
     project_id = state["project_id"]
-
-    if task_type != "unknown":
-        memory_updates.append(
-            f"User asked a {task_type} question in project '{project_id}'."
-        )
-
-    retrieved_chunks = state.get("retrieved_chunks", [])
-
-    if retrieved_chunks:
-        sources = sorted({chunk.source for chunk in retrieved_chunks})
-        memory_updates.append(
-            f"Retrieved context from sources: {', '.join(sources)}."
-        )
-
     user_query = state.get("user_query", "").strip()
+    final_answer = state.get("final_answer", "")
 
-    if user_query:
+    refused = final_answer.strip().startswith(REFUSAL_TEXT)
+
+    if user_query and final_answer and not refused:
         memory_updates.append(
-            f"Recent research question: {user_query}"
+            f"Q: {user_query} — A: {final_answer[:300]}"
         )
 
     for item in memory_updates:
@@ -217,18 +298,33 @@ def memory_update_node(state: AgentState) -> AgentState:
 def build_agent_graph():
     """
     Build and compile the LangGraph workflow.
+
+    START -> planner -> load_memory -> retrieve
+        -> (conditional) rewrite_query -> retrieve   [bounded retry]
+        -> synthesize -> citation_check -> memory_update -> END
     """
     graph = StateGraph(AgentState)
 
     graph.add_node("planner", planner_node)
+    graph.add_node("load_memory", load_memory_node)
     graph.add_node("retrieve", retrieve_node)
+    graph.add_node("rewrite_query", rewrite_query_node)
     graph.add_node("synthesize", synthesize_node)
     graph.add_node("citation_check", citation_check_node)
     graph.add_node("memory_update", memory_update_node)
 
     graph.add_edge(START, "planner")
-    graph.add_edge("planner", "retrieve")
-    graph.add_edge("retrieve", "synthesize")
+    graph.add_edge("planner", "load_memory")
+    graph.add_edge("load_memory", "retrieve")
+    graph.add_conditional_edges(
+        "retrieve",
+        route_after_retrieve,
+        {
+            "rewrite_query": "rewrite_query",
+            "synthesize": "synthesize",
+        },
+    )
+    graph.add_edge("rewrite_query", "retrieve")
     graph.add_edge("synthesize", "citation_check")
     graph.add_edge("citation_check", "memory_update")
     graph.add_edge("memory_update", END)
@@ -300,10 +396,7 @@ def run_agent(
     total_latency_ms = int((time.time() - total_start) * 1000)
 
     response = AskResponse(
-        answer=final_state.get(
-            "final_answer",
-            "I do not know from the uploaded documents.",
-        ),
+        answer=final_state.get("final_answer", REFUSAL_TEXT),
         citations=final_state.get("citations", []),
         metrics=AskMetrics(
             retrieval_latency_ms=final_state.get("retrieval_latency_ms", 0),
@@ -332,6 +425,7 @@ def run_agent(
     save_latest_metrics(response.metrics.model_dump())
     return response
 
+
 def run_agent_debug(
     user_id: str,
     project_id: str,
@@ -350,8 +444,108 @@ def run_agent_debug(
     return {
         "task_type": final_state.get("task_type", "unknown"),
         "retrieved_chunks": len(final_state.get("retrieved_chunks", [])),
+        "retrieval_attempts": final_state.get("retrieval_attempts", 0),
+        "active_query": final_state.get("active_query", ""),
+        "memory_context_chars": len(final_state.get("memory_context", "")),
         "citations": len(final_state.get("citations", [])),
         "memory_updates": final_state.get("memory_updates", []),
         "warnings": final_state.get("warnings", []),
         "answer": final_state.get("final_answer", ""),
     }
+
+
+def run_agent_stream(
+    user_id: str,
+    project_id: str,
+    user_query: str,
+    top_k: int | None = None,
+):
+    """
+    Streaming twin of run_agent.
+
+    Reuses the same node functions (planner, memory, retrieval with the
+    same weak-retrieval retry policy) and streams only the synthesis step.
+    Yields newline-delimited JSON events:
+        metadata -> token* -> citations_final -> done
+    """
+    state: AgentState = {
+        "user_id": user_id,
+        "project_id": project_id,
+        "user_query": user_query,
+        "top_k": top_k or settings.TOP_K,
+    }
+
+    state.update(planner_node(state))
+    state.update(load_memory_node(state))
+    state.update(retrieve_node(state))
+
+    while route_after_retrieve(state) == "rewrite_query":
+        state.update(rewrite_query_node(state))
+        state.update(retrieve_node(state))
+
+    chunks = state.get("retrieved_chunks", [])
+
+    yield json.dumps(
+        {
+            "type": "metadata",
+            "retrieval_latency_ms": state.get("retrieval_latency_ms", 0),
+            "task_type": state.get("task_type", "qa"),
+            "warnings": state.get("warnings", []),
+            # Provisional provenance; replaced by citations_final below.
+            "citations": [
+                {
+                    "source": chunk.source,
+                    "page": chunk.page,
+                    "chunk_id": chunk.chunk_id,
+                    "text": chunk.text[:500],
+                }
+                for chunk in chunks
+            ],
+        }
+    ) + "\n"
+
+    if not chunks:
+        yield json.dumps({"type": "token", "text": REFUSAL_TEXT}) + "\n"
+        yield json.dumps(
+            {"type": "citations_final", "citations": [], "warnings": []}
+        ) + "\n"
+        yield json.dumps({"type": "done"}) + "\n"
+        return
+
+    task_type = state.get("task_type", "qa")
+
+    if task_type == "compare":
+        prompt = build_compare_prompt(user_query)
+    elif task_type == "lit_review":
+        prompt = build_lit_review_prompt(user_query)
+    else:
+        prompt = build_qa_prompt(user_query)
+
+    context = build_context_from_chunks(chunks)
+
+    memory_context = state.get("memory_context", "")
+    if memory_context:
+        context = f"{memory_context}\n\n{context}"
+
+    full_answer = ""
+    for token in stream_answer(prompt=prompt, context=context):
+        full_answer += token
+        yield json.dumps({"type": "token", "text": token}) + "\n"
+
+    if full_answer.strip().startswith(REFUSAL_TEXT):
+        final_citations, citation_warnings = [], []
+    else:
+        final_citations, citation_warnings = filter_citations(full_answer, chunks)
+
+    yield json.dumps(
+        {
+            "type": "citations_final",
+            "citations": [citation.model_dump() for citation in final_citations],
+            "warnings": citation_warnings,
+        }
+    ) + "\n"
+
+    state["final_answer"] = full_answer
+    memory_update_node(state)
+
+    yield json.dumps({"type": "done"}) + "\n"
