@@ -50,7 +50,9 @@ LLM Backend
 ```text
 START
   → planner_node
+  → load_memory_node
   → retrieve_node
+  →(score < threshold, attempts left)→ rewrite_query_node → retrieve_node
   → synthesize_node
   → citation_check_node
   → memory_update_node
@@ -365,6 +367,6 @@ Built Research Agent, a local multi-user research automation platform using Fast
 
 * Image-only scanned PDFs are not supported.
 * The MVP uses username/project fields instead of full authentication.
-* Retrieval uses simple top-k semantic search without reranking.
+* Cross-encoder reranking (ENABLE_RERANKER) improves ranking precision but adds CPU latency per query; it is off by default for the fastest demo path. Weak retrieval triggers one score-gated query-rewrite retry (RETRIEVAL_MIN_SCORE, MAX_RETRIEVAL_ATTEMPTS) before abstaining.
 * llama.cpp quality depends on the chosen GGUF model.
 * vLLM support is implemented through an OpenAI-compatible backend abstraction, but requires a separate CUDA Linux GPU environment for full testing.
