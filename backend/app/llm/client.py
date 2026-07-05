@@ -148,8 +148,23 @@ def generate_answer(prompt: str, context: str = "") -> dict[str, Any]:
         text = response.choices[0].message.content or ""
         elapsed = time.time() - start_time
 
-        estimated_tokens = _estimate_tokens(text)
-        tokens_per_second = estimated_tokens / elapsed if elapsed > 0 else 0.0
+        usage = getattr(response, "usage", None)
+        completion_tokens = (
+            getattr(usage, "completion_tokens", None) if usage is not None else None
+        )
+
+        if completion_tokens:
+            tokens_per_second = (
+                completion_tokens / elapsed
+                if elapsed > 0
+                else 0.0
+            )
+        else:
+            tokens_per_second = (
+                _estimate_tokens(text) / elapsed
+                if elapsed > 0
+                else 0.0
+            )
 
         return {
             "text": text,
