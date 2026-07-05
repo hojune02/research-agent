@@ -43,7 +43,7 @@ from app.rag.vectorstore import get_collection_count, search_chunks
 # Phase 6: from app.rag.qa import answer_question
 
 # Phase 7 replacement from rag.qa to run_agent
-from app.agents.graph import run_agent, run_agent_debug
+from app.agents.graph import run_agent, run_agent_debug, run_agent_stream
 
 from app.tools.paper_tools import (
     compare_documents,
@@ -59,14 +59,21 @@ from app.metrics.tracker import get_latest_metrics
 from fastapi.responses import StreamingResponse
 from app.rag.qa import stream_answer_question
 
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
 app = FastAPI(
-    title=" Research Agent",
+    title="Research Agent",
     description="Local multi-user research automation agent with RAG, tool calling, memory, and local LLM serving.",
     version="0.1.0",
+    lifespan=lifespan,
 )
-@app.on_event("startup")
-def startup_event():
-    init_db()
 
 
 @app.get("/")
@@ -87,8 +94,10 @@ def health():
         "llm_model": settings.LLM_MODEL,
         "upload_dir": settings.UPLOAD_DIR,
         "chroma_path": settings.CHROMA_PATH,
-        "sqlite_path": settings.SQLITE_PATH,
+        "sqlite_path": settings.SQLITE_PATH,    
         "top_k": settings.TOP_K,
+        "enable_reranker": settings.ENABLE_RERANKER,
+        "retrieval_min_score": settings.RETRIEVAL_MIN_SCORE,
     }
 
 @app.post("/debug/llm", response_model=LLMResponse)
@@ -552,10 +561,10 @@ def ask_documents_stream(request: AskRequest):
     """
     try:
         return StreamingResponse(
-            stream_answer_question(
+            run_agent_stream(
                 user_id=request.user_id,
                 project_id=request.project_id,
-                question=request.question,
+                user_query=request.question,
                 top_k=request.top_k,
             ),
             media_type="application/x-ndjson",
