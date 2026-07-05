@@ -72,7 +72,7 @@ def startup_event():
 @app.get("/")
 def root():
     return {
-        "message": "Sounable Research Agent backend is running.",
+        "message": "Research Agent backend is running.",
         "docs": "/docs",
         "health": "/health",
     }

@@ -133,7 +133,7 @@ def summarize_outputs(rows: list[dict]):
         if isinstance(r.get("metrics", {}).get("total_latency_ms"), (int, float))
     ]
 
-    print("\n=== PaperOps Output Summary ===")
+    print("\n=== Research Agent Output Summary ===")
     print(f"cases={len(rows)}")
     print(f"answerable_cases={len(answerable)}")
     print(f"unsupported_cases={len(unsupported)}")
@@ -307,7 +307,7 @@ def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_run = sub.add_parser("run", help="Run PaperOps /ask on the benchmark")
+    p_run = sub.add_parser("run", help="Run Research Agent /ask on the benchmark")
     p_run.add_argument("--backend-url", default="http://localhost:8000")
     p_run.add_argument("--benchmark-file", default="evals/two_industroyers_50q_reference_benchmark.jsonl")
     p_run.add_argument("--outputs-file", default="evals/two_industroyers_outputs.jsonl")

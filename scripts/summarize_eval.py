@@ -34,7 +34,7 @@ def main():
     retrieval = load_jsonl(args.retrieval)
     answers = load_jsonl(args.answers)
 
-    print("# PaperOps Evaluation Summary\n")
+    print("# Research Agent Evaluation Summary\n")
 
     if retrieval:
         recall = sum(1 for r in retrieval if r.get("recall_hit")) / len(retrieval)

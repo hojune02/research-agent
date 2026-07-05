@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     UPLOAD_DIR: str = str(PROJECT_ROOT / "data" / "uploads")
     CHROMA_PATH: str = str(PROJECT_ROOT / "data" / "chroma")
-    SQLITE_PATH: str = str(PROJECT_ROOT / "data" / "sqlite" / "paperops.db")
+    SQLITE_PATH: str = str(PROJECT_ROOT / "data" / "sqlite" / "research_agent.db")
 
     TOP_K: int = 5
     CHUNK_SIZE: int = 900
