@@ -4,6 +4,8 @@ import statistics
 import time
 from pathlib import Path
 
+from judge_common import JUDGE_SYSTEM_PROMPT, METRIC_KEYS, extract_json
+
 import requests
 
 
@@ -253,55 +255,76 @@ Citations/context returned by RAG system:
     parsed["judge_raw"] = text
     return parsed
 
-
 def run_judge(args):
     from openai import OpenAI
 
-    client = OpenAI(
-        base_url=args.judge_base_url,
-        api_key=args.judge_api_key,
+    from judge_common import (
+        JUDGE_SYSTEM_PROMPT,
+        METRIC_KEYS,
+        aggregate_judge_runs,
+        build_judge_user_prompt,
+        extract_json,
     )
 
-    rows = []
-    for idx, item in enumerate(load_jsonl(args.outputs_file), start=1):
-        print(f"[JUDGE {idx}] {item['id']}")
-        try:
-            scores = judge_one(client, args.judge_model, item)
-        except Exception as exc:
-            scores = {
-                "answer_correctness": 0,
-                "faithfulness": 0,
-                "citation_support": 0,
-                "abstention_correctness": 0,
-                "reason": f"judge_error: {exc}",
-                "judge_raw": "",
-            }
+    rows = load_jsonl(args.outputs_file)
+    if not rows:
+        print(f"No rows found in {args.outputs_file}")
+        return
 
-        row = {
-            "id": item["id"],
-            "category": item["category"],
-            "difficulty": item["difficulty"],
-            "should_answer": item["should_answer"],
-            **scores,
-        }
-        rows.append(row)
-        print(row)
+    generator_models = {
+        str(row.get("metrics", {}).get("llm_model", "")) for row in rows
+    } - {""}
+    if args.judge_model in generator_models:
+        print(
+            "WARNING: judge model matches the generator model "
+            f"({args.judge_model}); scores are subject to self-preference bias."
+        )
 
-    save_jsonl(args.judge_file, rows)
+    client = OpenAI(base_url=args.judge_base_url, api_key=args.judge_api_key)
+
+    judged_rows = []
+    for idx, row in enumerate(rows, start=1):
+        print(f"[{idx}/{len(rows)}] judging {row.get('id')}")
+
+        run_dicts = []
+        for _ in range(args.judge_runs):
+            response = client.chat.completions.create(
+                model=args.judge_model,
+                messages=[
+                    {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+                    {"role": "user", "content": build_judge_user_prompt(row)},
+                ],
+                temperature=args.judge_temperature,
+                max_tokens=300,
+            )
+            text = response.choices[0].message.content or ""
+            run_dicts.append(extract_json(text))
+
+        judged = {**row, **aggregate_judge_runs(run_dicts)}
+        judged_rows.append(judged)
+
+    save_jsonl(args.judge_file, judged_rows)
+
+    answerable = [r for r in judged_rows if r.get("should_answer")]
+    unsupported = [r for r in judged_rows if not r.get("should_answer")]
+
+    import statistics as _stats
 
     print("\n=== Judge Summary ===")
-    print(f"cases={len(rows)}")
-    for key in ["answer_correctness", "faithfulness", "citation_support", "abstention_correctness"]:
-        vals = [float(r.get(key, 0)) for r in rows]
-        print(f"{key}_avg={statistics.mean(vals):.3f}/3")
+    print(f"cases={len(judged_rows)}  judge_model={args.judge_model}  runs_per_case={args.judge_runs}")
 
-    answerable = [r for r in rows if r["should_answer"]]
-    unsupported = [r for r in rows if not r["should_answer"]]
-    if answerable:
-        print(f"answerable_correctness_avg={statistics.mean(float(r.get('answer_correctness', 0)) for r in answerable):.3f}/3")
-    if unsupported:
-        print(f"unsupported_abstention_avg={statistics.mean(float(r.get('abstention_correctness', 0)) for r in unsupported):.3f}/3")
-
+    for key in METRIC_KEYS:
+        subset = answerable if key != "abstention_correctness" else unsupported
+        if not subset:
+            continue
+        means = [float(r.get(key, 0)) for r in subset]
+        stds = [float(r.get(f"{key}_std", 0.0)) for r in subset]
+        disagreements = sum(1 for s in stds if s > 0)
+        print(
+            f"{key}: {_stats.mean(means):.3f}/3 "
+            f"(avg within-question std {_stats.mean(stds):.3f}, "
+            f"judge self-disagreement on {disagreements}/{len(subset)} questions)"
+        )
 
 def main():
     parser = argparse.ArgumentParser()
@@ -312,14 +335,18 @@ def main():
     p_run.add_argument("--benchmark-file", default="evals/two_industroyers_50q_reference_benchmark.jsonl")
     p_run.add_argument("--outputs-file", default="evals/two_industroyers_outputs.jsonl")
     p_run.add_argument("--top-k", type=int, default=5)
+    p_run.add_argument("--judge-runs", type=int, default=3)
+    p_run.add_argument("--judge-temperature", type=float, default=0.0)
     p_run.set_defaults(func=run_outputs)
 
     p_judge = sub.add_parser("judge", help="Use an OpenAI-compatible judge model to score outputs")
     p_judge.add_argument("--outputs-file", default="evals/two_industroyers_outputs.jsonl")
     p_judge.add_argument("--judge-file", default="evals/two_industroyers_judge_scores.jsonl")
-    p_judge.add_argument("--judge-base-url", default="http://localhost:8002/v1")
+    p_judge.add_argument("--judge-base-url", default="http://localhost:8003/v1")
     p_judge.add_argument("--judge-api-key", default="local-key")
-    p_judge.add_argument("--judge-model", default="local-model")
+    p_judge.add_argument("--judge-model", default="judge-model")
+    p_judge.add_argument("--judge-runs", type=int, default=3)
+    p_judge.add_argument("--judge-temperature", type=float, default=0.0)
     p_judge.set_defaults(func=run_judge)
 
     args = parser.parse_args()
