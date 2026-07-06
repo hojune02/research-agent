@@ -23,7 +23,6 @@ def build_context_from_chunks(chunks: list[SearchResult]) -> str:
 
     return "\n\n".join(context_parts)
 
-
 def build_qa_prompt(question: str) -> str:
     return f"""
 You are Research Agent, a careful research assistant.
@@ -31,14 +30,16 @@ You are Research Agent, a careful research assistant.
 Answer the user's question using only the provided context.
 
 Rules:
-- If the answer is not supported by the context, say: "I do not know from the uploaded documents."
+- If the answer is not supported by the context, say exactly: "I do not know from the uploaded documents."
 - Do not use outside knowledge.
 - Be concise but specific.
-- After each claim, cite the supporting source inline using its bracket tag, e.g. [Source 2].
+- Every sentence that states a fact MUST end with a citation tag like [Source 1] or [Source 2], matching the numbered sources in the context.
 - Only cite sources whose text actually supports the claim.
-- If a "Known project context" section is present, treat it as background from
-  earlier sessions; never cite it as a source.
+- If a "Known project context" section is present, treat it as background from earlier sessions; never cite it as a source.
 - Do not invent citations.
+
+Example of the required citation format:
+"Industroyer 1 supports four protocol payloads [Source 1]. The IEC-104 payload repeats a configurable command sequence [Source 3]."
 
 User question:
 {question}

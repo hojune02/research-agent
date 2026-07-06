@@ -25,6 +25,28 @@ from app.tools.paper_tools import retrieve_context, save_memory
 
 REFUSAL_TEXT = "I do not know from the uploaded documents."
 
+def _is_refusal(text: str) -> bool:
+    normalized = text.strip().lower()
+    return normalized.startswith("i do not know") or "do not know from the" in normalized
+
+def _clean_rewritten_query(raw: str, fallback: str) -> str:
+    """Extract the actual query from a small model's chatty rewrite output."""
+    text = " ".join(raw.split()).strip().strip('"')
+    if not text:
+        return fallback
+
+    # Model wrapped the query in quotes -> take the longest quoted span.
+    quoted = re.findall(r'"([^"]+)"', raw)
+    if quoted:
+        return max(quoted, key=len).strip()[:300]
+
+    # Model prefixed commentary ending in a colon -> take what follows the last colon.
+    if ":" in text:
+        tail = text.rsplit(":", 1)[1].strip().strip('"')
+        if len(tail) >= 3:
+            return tail[:300]
+
+    return text[:300]
 
 def planner_node(state: AgentState) -> AgentState:
     """
@@ -161,11 +183,11 @@ def rewrite_query_node(state: AgentState) -> AgentState:
     try:
         result = generate_answer(prompt=rewrite_prompt, context="")
         rewritten = (result.get("text") or "").strip().strip('"')
-    except RuntimeError:
+        rewritten = " ".join(rewritten.split())[:300]
+    except Exception:
         rewritten = ""
 
-    if not rewritten:
-        rewritten = state["user_query"]
+    rewritten = _clean_rewritten_query(rewritten, state["user_query"])
 
     warnings = state.get("warnings", []) + [
         f"Low retrieval confidence; retried with rewritten query: {rewritten[:120]}"
@@ -245,7 +267,7 @@ def citation_check_node(state: AgentState) -> AgentState:
 
     final_answer = draft_answer or REFUSAL_TEXT
 
-    if final_answer.strip().startswith(REFUSAL_TEXT):
+    if _is_refusal(final_answer):
         return {
             "citations": [],
             "final_answer": final_answer,
@@ -275,7 +297,7 @@ def memory_update_node(state: AgentState) -> AgentState:
     user_query = state.get("user_query", "").strip()
     final_answer = state.get("final_answer", "")
 
-    refused = final_answer.strip().startswith(REFUSAL_TEXT)
+    refused = _is_refusal(final_answer)
 
     if user_query and final_answer and not refused:
         memory_updates.append(
@@ -532,7 +554,7 @@ def run_agent_stream(
         full_answer += token
         yield json.dumps({"type": "token", "text": token}) + "\n"
 
-    if full_answer.strip().startswith(REFUSAL_TEXT):
+    if _is_refusal(full_answer):
         final_citations, citation_warnings = [], []
     else:
         final_citations, citation_warnings = filter_citations(full_answer, chunks)

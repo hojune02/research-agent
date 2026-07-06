@@ -11,7 +11,7 @@ services:
     environment:
       - UPLOAD_DIR=/app/data/uploads
       - CHROMA_PATH=/app/data/chroma
-      - SQLITE_PATH=/app/data/sqlite/paperops.db
+      - SQLITE_PATH=/app/data/sqlite/research_agent.db
 
   frontend:
     build:
