@@ -57,7 +57,6 @@ from app.db.memory import create_memory, delete_memory, list_memories
 from app.metrics.tracker import get_latest_metrics
 
 from fastapi.responses import StreamingResponse
-from app.rag.qa import stream_answer_question
 
 from contextlib import asynccontextmanager
 
