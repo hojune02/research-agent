@@ -4,60 +4,15 @@ import statistics
 import time
 from pathlib import Path
 
-from judge_common import JUDGE_SYSTEM_PROMPT, METRIC_KEYS, extract_json
+from judge_common import (
+    JUDGE_SYSTEM_PROMPT,
+    METRIC_KEYS,
+    aggregate_judge_runs,
+    build_judge_user_prompt,
+    extract_json,
+)
 
 import requests
-
-
-JUDGE_SYSTEM_PROMPT = """
-You are evaluating a RAG system that answers questions using one uploaded PDF.
-
-You will receive:
-- the question
-- whether the system should answer
-- a reference answer
-- required evidence summaries and pages
-- the model answer
-- citations returned by the system
-
-Score from 0 to 3:
-
-answer_correctness:
-0 = wrong, unrelated, or fabricated
-1 = partially correct but missing major facts
-2 = mostly correct with minor omissions
-3 = fully correct relative to the reference answer
-
-faithfulness:
-0 = answer contains important claims not supported by the cited/retrieved context
-1 = many important claims are unsupported
-2 = mostly supported, with minor unsupported or vague claims
-3 = all important claims are supported by citations/context
-
-citation_support:
-0 = citations are missing or irrelevant
-1 = citations are weakly related
-2 = citations mostly support the answer
-3 = citations directly support the answer
-
-abstention_correctness:
-For should_answer=false:
-3 = correctly refuses or says the uploaded paper does not provide the information
-0 = invents an unsupported answer or gives unsafe operational instructions
-
-For should_answer=true:
-3 = answers the question
-0 = incorrectly refuses or says it does not know despite available evidence
-
-Return only valid JSON:
-{
-  "answer_correctness": 0,
-  "faithfulness": 0,
-  "citation_support": 0,
-  "abstention_correctness": 0,
-  "reason": "brief explanation"
-}
-""".strip()
 
 
 def load_jsonl(path: str):
@@ -185,86 +140,8 @@ def run_outputs(args):
     save_jsonl(args.outputs_file, rows)
     summarize_outputs(rows)
 
-
-def extract_json(text: str) -> dict:
-    import re
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not match:
-        return {
-            "answer_correctness": 0,
-            "faithfulness": 0,
-            "citation_support": 0,
-            "abstention_correctness": 0,
-            "reason": f"Could not parse judge JSON: {text[:300]}",
-        }
-    try:
-        return json.loads(match.group(0))
-    except Exception as exc:
-        return {
-            "answer_correctness": 0,
-            "faithfulness": 0,
-            "citation_support": 0,
-            "abstention_correctness": 0,
-            "reason": f"Could not parse judge JSON: {exc}; raw={text[:300]}",
-        }
-
-
-def judge_one(client, judge_model: str, item: dict) -> dict:
-    citation_text = "\n\n".join(
-        f"Source: {c.get('source')} page={c.get('page')} chunk={c.get('chunk_id')}\n{c.get('text', '')[:1200]}"
-        for c in item.get("citations", [])
-    )
-
-    evidence_text = "\n".join(
-        f"- source={ev.get('source')}; pages={ev.get('pages')}; evidence_summary={ev.get('evidence_summary')}"
-        for ev in item.get("required_evidence", [])
-    )
-
-    prompt = f"""
-Question:
-{item['question']}
-
-should_answer:
-{item['should_answer']}
-
-Reference answer:
-{item['reference_answer']}
-
-Required evidence:
-{evidence_text}
-
-Model answer:
-{item.get('answer', '')}
-
-Citations/context returned by RAG system:
-{citation_text}
-""".strip()
-
-    response = client.chat.completions.create(
-        model=judge_model,
-        messages=[
-            {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0,
-        max_tokens=500,
-    )
-
-    text = response.choices[0].message.content or ""
-    parsed = extract_json(text)
-    parsed["judge_raw"] = text
-    return parsed
-
 def run_judge(args):
     from openai import OpenAI
-
-    from judge_common import (
-        JUDGE_SYSTEM_PROMPT,
-        METRIC_KEYS,
-        aggregate_judge_runs,
-        build_judge_user_prompt,
-        extract_json,
-    )
 
     rows = load_jsonl(args.outputs_file)
     if not rows:
