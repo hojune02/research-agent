@@ -66,7 +66,9 @@ The planner classifies the user request into one of:
 * `lit_review`
 * `unknown`
 
-The retrieval node calls the `retrieve_context` tool, which searches Chroma using strict `user_id` and `project_id` metadata filtering. The synthesis node sends retrieved chunks to the configured LLM backend. The citation checker attaches source/page/chunk citations. The memory update node stores useful project-level memory in SQLite.
+The retrieval node calls the `retrieve_context` tool, which searches Chroma using strict `user_id` and `project_id` metadata filtering.
+
+The load-memory node injects recent project memory from SQLite as background context. The retrieval node searches Chroma with strict user/project filtering; when the best retrieval score falls below RETRIEVAL_MIN_SCORE, a conditional edge routes through one bounded LLM query rewrite before retrying. The synthesis node sends retrieved chunks (plus memory background) to the configured LLM backend, prompting for inline [Source n] citations. The citation-check node parses those inline markers and keeps only the chunks the answer actually cited; refusals carry no citations. The memory update node stores a compact Q/A record for non-refusal answers in SQLite.
 
 ## Tech Stack
 
