@@ -295,22 +295,22 @@ def ask_docs_stream(user_id: str, project_id: str, question: str, top_k: int):
                     yield answer, citations, metadata
 
                 elif event_type == "done":
-                        metrics = {
-                            **metadata,
-                            "time_to_first_token_ms": first_token_ms,
-                            "total_stream_time_ms": int((time.time() - start_time) * 1000),
-                            "answer_chars": len(answer),
-                            "answer_words": len(answer.split()),
-                        }
+                    metrics = {
+                        **metadata,
+                        "time_to_first_token_ms": first_token_ms,
+                        "total_stream_time_ms": int((time.time() - start_time) * 1000),
+                        "answer_chars": len(answer),
+                        "answer_words": len(answer.split()),
+                    }
 
-                        yield answer, citations, metrics
-                        return
+                    yield answer, citations, metrics
+                    return
 
     except Exception as exc:
         yield f"[ERROR] {exc}", citations, metadata
 
 
-with gr.Blocks(title=" Research Agent") as demo:
+with gr.Blocks(title="Research Agent") as demo:
     gr.Markdown(
         """
         #  Research Agent
