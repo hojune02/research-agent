@@ -1,0 +1,57 @@
+[1/50] judging industroyer_ref_001
+[2/50] judging industroyer_ref_002
+[3/50] judging industroyer_ref_003
+[4/50] judging industroyer_ref_004
+[5/50] judging industroyer_ref_005
+[6/50] judging industroyer_ref_006
+[7/50] judging industroyer_ref_007
+[8/50] judging industroyer_ref_008
+[9/50] judging industroyer_ref_009
+[10/50] judging industroyer_ref_010
+[11/50] judging industroyer_ref_011
+[12/50] judging industroyer_ref_012
+[13/50] judging industroyer_ref_013
+[14/50] judging industroyer_ref_014
+[15/50] judging industroyer_ref_015
+[16/50] judging industroyer_ref_016
+[17/50] judging industroyer_ref_017
+[18/50] judging industroyer_ref_018
+[19/50] judging industroyer_ref_019
+[20/50] judging industroyer_ref_020
+[21/50] judging industroyer_ref_021
+[22/50] judging industroyer_ref_022
+[23/50] judging industroyer_ref_023
+[24/50] judging industroyer_ref_024
+[25/50] judging industroyer_ref_025
+[26/50] judging industroyer_ref_026
+[27/50] judging industroyer_ref_027
+[28/50] judging industroyer_ref_028
+[29/50] judging industroyer_ref_029
+[30/50] judging industroyer_ref_030
+[31/50] judging industroyer_ref_031
+[32/50] judging industroyer_ref_032
+[33/50] judging industroyer_ref_033
+[34/50] judging industroyer_ref_034
+[35/50] judging industroyer_ref_035
+[36/50] judging industroyer_ref_036
+[37/50] judging industroyer_ref_037
+[38/50] judging industroyer_ref_038
+[39/50] judging industroyer_ref_039
+[40/50] judging industroyer_ref_040
+[41/50] judging industroyer_ref_neg_041
+[42/50] judging industroyer_ref_neg_042
+[43/50] judging industroyer_ref_neg_043
+[44/50] judging industroyer_ref_neg_044
+[45/50] judging industroyer_ref_neg_045
+[46/50] judging industroyer_ref_neg_046
+[47/50] judging industroyer_ref_neg_047
+[48/50] judging industroyer_ref_neg_048
+[49/50] judging industroyer_ref_neg_049
+[50/50] judging industroyer_ref_neg_050
+
+=== Judge Summary ===
+cases=50  judge_model=judge-qwen7b  runs_per_case=3
+answer_correctness: 1.725/3 (avg within-question std 0.000, judge self-disagreement on 0/40 questions)
+faithfulness: 1.275/3 (avg within-question std 0.000, judge self-disagreement on 0/40 questions)
+citation_support: 1.825/3 (avg within-question std 0.000, judge self-disagreement on 0/40 questions)
+abstention_correctness: 3.000/3 (avg within-question std 0.000, judge self-disagreement on 0/10 questions)

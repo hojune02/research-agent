@@ -143,7 +143,7 @@ def run_outputs(args):
 def run_judge(args):
     from openai import OpenAI
 
-    rows = load_jsonl(args.outputs_file)
+    rows = list(load_jsonl(args.outputs_file))
     if not rows:
         print(f"No rows found in {args.outputs_file}")
         return
