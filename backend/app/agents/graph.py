@@ -110,7 +110,7 @@ def load_memory_node(state: AgentState) -> AgentState:
     lines = [f"- {memory.memory_item}" for memory in reversed(memories)]
     block = "Known project context from earlier sessions:\n" + "\n".join(lines)
 
-    return {"memory_context": block[:800]}
+    return {"memory_context": block[:400]}
 
 
 def retrieve_node(state: AgentState) -> AgentState:
@@ -174,7 +174,7 @@ def rewrite_query_node(state: AgentState) -> AgentState:
     Rewrites the query once when retrieval confidence is low.
     """
     rewrite_prompt = (
-        "Rewrite the following search query to maximize recall in a "
+        "Rewrite the following search query to fix any potential typo, maximize recall in a "
         "semantic search over academic PDF chunks. Expand abbreviations, "
         "add likely synonyms, keep it under 30 words. "
         "Return only the rewritten query.\n\n"
@@ -226,11 +226,12 @@ def synthesize_node(state: AgentState) -> AgentState:
     else:
         prompt = build_qa_prompt(state["user_query"])
 
+   # Memory is intentionally NOT injected into the QA grounding context.
+    # Retrieved document chunks are the sole basis for factual answers;
+    # mixing prior-session memory into the context primes small models to
+    # refuse and consumes the limited context window. Memory is kept in
+    # state for observability and future non-grounding uses only.
     context = build_context_from_chunks(chunks)
-
-    memory_context = state.get("memory_context", "")
-    if memory_context:
-        context = f"{memory_context}\n\n{context}"
 
     llm_result = generate_answer(
         prompt=prompt,
@@ -299,11 +300,10 @@ def memory_update_node(state: AgentState) -> AgentState:
     final_answer = state.get("final_answer", "")
 
     refused = _is_refusal(final_answer)
+    low_signal = "do not know" in final_answer.lower() or len(final_answer) < 40
 
-    if user_query and final_answer and not refused:
-        memory_updates.append(
-            f"Q: {user_query} — A: {final_answer[:300]}"
-        )
+    if user_query and final_answer and not refused and not low_signal:
+        memory_updates.append(f"Topic asked: {user_query} (answered)")
 
     for item in memory_updates:
         save_memory(
@@ -545,10 +545,6 @@ def run_agent_stream(
         prompt = build_qa_prompt(user_query)
 
     context = build_context_from_chunks(chunks)
-
-    memory_context = state.get("memory_context", "")
-    if memory_context:
-        context = f"{memory_context}\n\n{context}"
 
     full_answer = ""
     for token in stream_answer(prompt=prompt, context=context):
