@@ -1,5 +1,7 @@
 # Research Agent
 
+For a short guide to the implementation, evaluation artifacts, and current limits, see [PORTFOLIO.md](PORTFOLIO.md).
+
 Research Agent is a local multi-user research automation MVP.
 
 The project is designed to demonstrate:
